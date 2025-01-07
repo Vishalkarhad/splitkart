@@ -133,7 +133,7 @@ def signup():
         "password": password,
     }
     db.users.insert_one(user)
-    return jsonify({"status": "success", "message": "User registered successfully!", "user_id": user_id})
+    return render_template("login.html")
 
 
 @app.route("/login")
@@ -204,7 +204,7 @@ def view_cart():
     global g_total_price,g_sharing_people,g_total
     g_total_price = total_price
     g_total=g_total_price//(g_sharing_people-1)
-    return render_template("cart1.html", cart=g_cart1 ,total_price1=g_total_price//3,total_price=g_total_price ,share_with_people=3,referral_code=g_referral_code,s_price=g_sharing_price)
+    return render_template("cart1.html", cart=g_cart1 ,total_price1=g_total_price//3,total_price=g_total_price ,share_with_people=4,referral_code=g_referral_code,s_price=g_sharing_price)
 
 @app.route("/cart_summary", methods=["GET", "POST"])
 def cart_summary():
