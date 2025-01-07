@@ -1,0 +1,266 @@
+/* General Styles */
+body {
+    font-family: Arial, sans-serif;
+    margin: 0;
+    padding: 0;
+    line-height: 1.6;
+}
+
+/* Header and Navbar Styles */
+header {
+    background: #f8f8f8;
+    border-bottom: 1px solid #ddd;
+    position: relative;
+    z-index: 10;
+}
+
+.top-bar {
+    background: #333;
+    color: #fff;
+    text-align: center;
+    padding: 10px 0;
+    font-size: 14px;
+}
+
+.navbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 15px 20px;
+    flex-wrap: wrap;
+}
+
+.navbar .logo {
+    font-size: 24px;
+    font-weight: bold;
+    margin-bottom: 10px;
+}
+
+.navbar .menu {
+    list-style: none;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin: 0;
+    padding: 0;
+}
+
+.navbar .menu li a {
+    text-decoration: none;
+    color: #333;
+    font-weight: bold;
+}
+
+/* Referral Section */
+.referral-section {
+    background: #f8f8f8;
+    text-align: center;
+    padding: 20px 10px;
+    border-bottom: 1px solid #ddd;
+}
+
+.referral-section input {
+    padding: 10px;
+    width: 100%;
+    max-width: 300px;
+    border: 1px solid #ddd;
+    border-radius: 5px;
+}
+
+.referral-section button {
+    background: #28a745;
+    color: #fff;
+    padding: 10px 15px;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    margin-top: 10px;
+}
+
+.referral-section button:hover {
+    background: #218838;
+}
+
+/* Product Overview */
+.product-overview {
+    text-align: center;
+    padding: 40px 20px;
+}
+
+.product-overview h1 {
+    font-size: 28px;
+    margin-bottom: 20px;
+}
+
+.product-overview .categories {
+    list-style: none;
+    display: flex;
+    justify-content: center;
+    flex-wrap: wrap;
+    margin-bottom: 30px;
+    padding: 0;
+    gap: 10px;
+}
+
+.product-overview .categories li a {
+    text-decoration: none;
+    color: #555;
+    font-weight: bold;
+}
+
+/* Horizontal Scroll for Products */
+.product-scroll-container {
+    display: flex;
+    overflow-x: auto;
+    gap: 20px;
+    padding: 20px;
+    scroll-behavior: smooth;
+}
+
+.product-scroll-container::-webkit-scrollbar {
+    height: 8px;
+}
+
+.product-scroll-container::-webkit-scrollbar-thumb {
+    background: #ccc;
+    border-radius: 5px;
+}
+
+.product-scroll-container::-webkit-scrollbar-track {
+    background: #f1f1f1;
+}
+
+/* Product Card Styles */
+.product-card {
+    border: 1px solid #ddd;
+    padding: 15px;
+    text-align: center;
+    width: 200px;
+    border-radius: 5px;
+    background: #fff;
+    flex: 0 0 auto;
+    transition: box-shadow 0.3s;
+}
+
+.product-card:hover {
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+}
+
+.product-card img {
+    max-width: 100%;
+    height: auto;
+    border-bottom: 1px solid #ddd;
+    margin-bottom: 10px;
+}
+
+.product-card h3 {
+    font-size: 18px;
+    margin: 10px 0;
+}
+
+.product-card p {
+    font-size: 16px;
+    margin: 10px 0;
+}
+
+.product-card .original-price {
+    text-decoration: line-through;
+    color: #d72828;
+    margin-right: 5px;
+}
+
+.product-card .offer-price {
+    color: #468d17;
+    font-weight: bold;
+}
+
+.product-card .add-to-cart {
+    background: #3498db;
+    color: #fff;
+    border: none;
+    padding: 10px 15px;
+    border-radius: 5px;
+    cursor: pointer;
+    margin-top: 10px;
+}
+
+.product-card .add-to-cart:hover {
+    background: #2980b9;
+}
+
+/* Footer */
+footer {
+    background: #333;
+    color: #fff;
+    text-align: center;
+    padding: 20px 0;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    
+/* --------------------------------------------------------------------- */
+    
+.navbar {
+    flex-direction: column;
+    align-items: flex-start; 
+    align-items: center; 
+    
+}
+
+.navbar .menu {
+    flex-direction: column;
+    gap: 5px;
+}
+
+.referral-section input {
+    max-width: 90%;
+}
+
+.product-scroll-container {
+    gap: 10px;
+    
+}
+
+.product-card {
+    width: 150px;
+}
+
+.product-card h3 {
+    font-size: 16px;
+}
+
+.product-card p {
+    font-size: 14px;
+}
+}
+
+@media (max-width: 480px) {
+.navbar .logo {
+    font-size: 20px;
+}
+
+.product-card {
+    width: 120px;
+}
+
+.product-card h3 {
+    font-size: 14px;
+}
+
+.product-card p {
+    font-size: 12px;
+}
+
+.product-card .add-to-cart {
+    padding: 8px 10px;
+}
+}
+/* @keyframes fadeInOut {
+0%, 100% { opacity: 0; transform: translateY(-50px); }
+10%, 90% { opacity: 1; transform: translateY(0); }
+}
+
+#popup-notification.show {
+animation: fadeInOut 3s ease-in-out forwards;
+} */
