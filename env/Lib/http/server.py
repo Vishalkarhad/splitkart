@@ -2,18 +2,18 @@
 
 Note: BaseHTTPRequestHandler doesn't implement any HTTP request; see
 SimpleHTTPRequestHandler for simple implementations of GET, HEAD and POST,
-and (deprecated) CGIHTTPRequestHandler for CGI scripts.
+and CGIHTTPRequestHandler for CGI scripts.
 
-It does, however, optionally implement HTTP/1.1 persistent connections.
+It does, however, optionally implement HTTP/1.1 persistent connections,
+as of version 0.3.
 
 Notes on CGIHTTPRequestHandler
 ------------------------------
 
-This class is deprecated. It implements GET and POST requests to cgi-bin scripts.
+This class implements GET and POST requests to cgi-bin scripts.
 
-If the os.fork() function is not present (Windows), subprocess.Popen() is used,
-with slightly altered but never documented semantics.  Use from a threaded
-process is likely to trigger a warning at os.fork() time.
+If the os.fork() function is not present (e.g. on Windows),
+subprocess.Popen() is used as a fallback, with slightly altered semantics.
 
 In all cases, the implementation is intentionally naive -- all
 requests are executed synchronously.
@@ -110,10 +110,11 @@ from http import HTTPStatus
 
 # Default error message template
 DEFAULT_ERROR_MESSAGE = """\
-<!DOCTYPE HTML>
-<html lang="en">
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN"
+        "http://www.w3.org/TR/html4/strict.dtd">
+<html>
     <head>
-        <meta charset="utf-8">
+        <meta http-equiv="Content-Type" content="text/html;charset=utf-8">
         <title>Error response</title>
     </head>
     <body>
@@ -300,10 +301,6 @@ class BaseHTTPRequestHandler(socketserver.StreamRequestHandler):
                 #   - Leading zeros MUST be ignored by recipients.
                 if len(version_number) != 2:
                     raise ValueError
-                if any(not component.isdigit() for component in version_number):
-                    raise ValueError("non digit in http version")
-                if any(len(component) > 10 for component in version_number):
-                    raise ValueError("unreasonable length http version")
                 version_number = int(version_number[0]), int(version_number[1])
             except (ValueError, IndexError):
                 self.send_error(
@@ -423,7 +420,7 @@ class BaseHTTPRequestHandler(socketserver.StreamRequestHandler):
             method = getattr(self, mname)
             method()
             self.wfile.flush() #actually send the response if not already done.
-        except TimeoutError as e:
+        except socket.timeout as e:
             #a read or a write timed out.  Discard this connection
             self.log_error("Request timed out: %r", e)
             self.close_connection = True
@@ -657,7 +654,6 @@ class SimpleHTTPRequestHandler(BaseHTTPRequestHandler):
     """
 
     server_version = "SimpleHTTP/" + __version__
-    index_pages = ("index.html", "index.htm")
     extensions_map = _encodings_map_default = {
         '.gz': 'application/gzip',
         '.Z': 'application/octet-stream',
@@ -711,9 +707,9 @@ class SimpleHTTPRequestHandler(BaseHTTPRequestHandler):
                 self.send_header("Content-Length", "0")
                 self.end_headers()
                 return None
-            for index in self.index_pages:
+            for index in "index.html", "index.htm":
                 index = os.path.join(path, index)
-                if os.path.isfile(index):
+                if os.path.exists(index):
                     path = index
                     break
             else:
@@ -723,7 +719,7 @@ class SimpleHTTPRequestHandler(BaseHTTPRequestHandler):
         # The test for this was added in test_httpserver.py
         # However, some OS platforms accept a trailingSlash as a filename
         # See discussion on python-dev and Issue34711 regarding
-        # parsing and rejection of filenames with a trailing slash
+        # parseing and rejection of filenames with a trailing slash
         if path.endswith("/"):
             self.send_error(HTTPStatus.NOT_FOUND, "File not found")
             return None
@@ -798,13 +794,14 @@ class SimpleHTTPRequestHandler(BaseHTTPRequestHandler):
             displaypath = urllib.parse.unquote(self.path)
         displaypath = html.escape(displaypath, quote=False)
         enc = sys.getfilesystemencoding()
-        title = f'Directory listing for {displaypath}'
-        r.append('<!DOCTYPE HTML>')
-        r.append('<html lang="en">')
-        r.append('<head>')
-        r.append(f'<meta charset="{enc}">')
-        r.append(f'<title>{title}</title>\n</head>')
-        r.append(f'<body>\n<h1>{title}</h1>')
+        title = 'Directory listing for %s' % displaypath
+        r.append('<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN" '
+                 '"http://www.w3.org/TR/html4/strict.dtd">')
+        r.append('<html>\n<head>')
+        r.append('<meta http-equiv="Content-Type" '
+                 'content="text/html; charset=%s">' % enc)
+        r.append('<title>%s</title>\n</head>' % title)
+        r.append('<body>\n<h1>%s</h1>' % title)
         r.append('<hr>\n<ul>')
         for name in list:
             fullname = os.path.join(path, name)
@@ -897,7 +894,7 @@ class SimpleHTTPRequestHandler(BaseHTTPRequestHandler):
         ext = ext.lower()
         if ext in self.extensions_map:
             return self.extensions_map[ext]
-        guess, _ = mimetypes.guess_file_type(path)
+        guess, _ = mimetypes.guess_type(path)
         if guess:
             return guess
         return 'application/octet-stream'
@@ -985,12 +982,6 @@ class CGIHTTPRequestHandler(SimpleHTTPRequestHandler):
     The POST command is *only* implemented for CGI scripts.
 
     """
-
-    def __init__(self, *args, **kwargs):
-        import warnings
-        warnings._deprecated("http.server.CGIHTTPRequestHandler",
-                             remove=(3, 15))
-        super().__init__(*args, **kwargs)
 
     # Determine platform specifics
     have_fork = hasattr(os, 'fork')
@@ -1117,7 +1108,8 @@ class CGIHTTPRequestHandler(SimpleHTTPRequestHandler):
         env['PATH_INFO'] = uqrest
         env['PATH_TRANSLATED'] = self.translate_path(uqrest)
         env['SCRIPT_NAME'] = scriptname
-        env['QUERY_STRING'] = query
+        if query:
+            env['QUERY_STRING'] = query
         env['REMOTE_ADDR'] = self.client_address[0]
         authorization = self.headers.get("authorization")
         if authorization:
@@ -1284,19 +1276,15 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--cgi', action='store_true',
                         help='run as CGI server')
-    parser.add_argument('-b', '--bind', metavar='ADDRESS',
-                        help='bind to this address '
+    parser.add_argument('--bind', '-b', metavar='ADDRESS',
+                        help='specify alternate bind address '
                              '(default: all interfaces)')
-    parser.add_argument('-d', '--directory', default=os.getcwd(),
-                        help='serve this directory '
+    parser.add_argument('--directory', '-d', default=os.getcwd(),
+                        help='specify alternate directory '
                              '(default: current directory)')
-    parser.add_argument('-p', '--protocol', metavar='VERSION',
-                        default='HTTP/1.0',
-                        help='conform to this HTTP version '
-                             '(default: %(default)s)')
-    parser.add_argument('port', default=8000, type=int, nargs='?',
-                        help='bind to this port '
-                             '(default: %(default)s)')
+    parser.add_argument('port', action='store', default=8000, type=int,
+                        nargs='?',
+                        help='specify alternate port (default: 8000)')
     args = parser.parse_args()
     if args.cgi:
         handler_class = CGIHTTPRequestHandler
@@ -1322,5 +1310,4 @@ if __name__ == '__main__':
         ServerClass=DualStackServer,
         port=args.port,
         bind=args.bind,
-        protocol=args.protocol,
     )

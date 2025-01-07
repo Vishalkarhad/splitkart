@@ -28,6 +28,23 @@ __all__ = ["Button", "Checkbutton", "Combobox", "Entry", "Frame", "Label",
 import tkinter
 from tkinter import _flatten, _join, _stringify, _splitdict
 
+# Verify if Tk is new enough to not need the Tile package
+_REQUIRE_TILE = True if tkinter.TkVersion < 8.5 else False
+
+def _load_tile(master):
+    if _REQUIRE_TILE:
+        import os
+        tilelib = os.environ.get('TILE_LIBRARY')
+        if tilelib:
+            # append custom tile path to the list of directories that
+            # Tcl uses when attempting to resolve packages with the package
+            # command
+            master.tk.eval(
+                    'global auto_path; '
+                    'lappend auto_path {%s}' % tilelib)
+
+        master.tk.eval('package require tile') # TclError may be raised here
+        master._tile_loaded = True
 
 def _format_optvalue(value, script=False):
     """Internal function."""
@@ -95,47 +112,40 @@ def _format_mapdict(mapdict, script=False):
 
 def _format_elemcreate(etype, script=False, *args, **kw):
     """Formats args and kw according to the given element factory etype."""
-    specs = ()
+    spec = None
     opts = ()
-    if etype == "image": # define an element based on an image
-        # first arg should be the default image name
-        iname = args[0]
-        # next args, if any, are statespec/value pairs which is almost
-        # a mapdict, but we just need the value
-        imagespec = (iname, *_mapdict_values(args[1:]))
-        if script:
-            specs = (imagespec,)
-        else:
-            specs = (_join(imagespec),)
-        opts = _format_optdict(kw, script)
+    if etype in ("image", "vsapi"):
+        if etype == "image": # define an element based on an image
+            # first arg should be the default image name
+            iname = args[0]
+            # next args, if any, are statespec/value pairs which is almost
+            # a mapdict, but we just need the value
+            imagespec = _join(_mapdict_values(args[1:]))
+            spec = "%s %s" % (iname, imagespec)
 
-    if etype == "vsapi":
-        # define an element whose visual appearance is drawn using the
-        # Microsoft Visual Styles API which is responsible for the
-        # themed styles on Windows XP and Vista.
-        # Availability: Tk 8.6, Windows XP and Vista.
-        if len(args) < 3:
-            class_name, part_id = args
-            statemap = (((), 1),)
         else:
-            class_name, part_id, statemap = args
-        specs = (class_name, part_id, tuple(_mapdict_values(statemap)))
+            # define an element whose visual appearance is drawn using the
+            # Microsoft Visual Styles API which is responsible for the
+            # themed styles on Windows XP and Vista.
+            # Availability: Tk 8.6, Windows XP and Vista.
+            class_name, part_id = args[:2]
+            statemap = _join(_mapdict_values(args[2:]))
+            spec = "%s %s %s" % (class_name, part_id, statemap)
+
         opts = _format_optdict(kw, script)
 
     elif etype == "from": # clone an element
         # it expects a themename and optionally an element to clone from,
         # otherwise it will clone {} (empty element)
-        specs = (args[0],) # theme name
+        spec = args[0] # theme name
         if len(args) > 1: # elementfrom specified
             opts = (_format_optvalue(args[1], script),)
 
     if script:
-        specs = _join(specs)
+        spec = '{%s}' % spec
         opts = ' '.join(opts)
-        return specs, opts
-    else:
-        return *specs, opts
 
+    return spec, opts
 
 def _format_layoutlist(layout, indent=0, indent_size=2):
     """Formats a layout list so we can pass the result to ttk::style
@@ -221,10 +231,10 @@ def _script_from_settings(settings):
 
             elemargs = eopts[1:argc]
             elemkw = eopts[argc] if argc < len(eopts) and eopts[argc] else {}
-            specs, eopts = _format_elemcreate(etype, True, *elemargs, **elemkw)
+            spec, opts = _format_elemcreate(etype, True, *elemargs, **elemkw)
 
             script.append("ttk::style element create %s %s %s %s" % (
-                name, etype, specs, eopts))
+                name, etype, spec, opts))
 
     return '\n'.join(script)
 
@@ -350,6 +360,11 @@ class Style(object):
 
     def __init__(self, master=None):
         master = setup_master(master)
+
+        if not getattr(master, '_tile_loaded', False):
+            # Load tile now, if needed
+            _load_tile(master)
+
         self.master = master
         self.tk = self.master.tk
 
@@ -441,9 +456,9 @@ class Style(object):
 
     def element_create(self, elementname, etype, *args, **kw):
         """Create a new element in the current theme of given etype."""
-        *specs, opts = _format_elemcreate(etype, False, *args, **kw)
+        spec, opts = _format_elemcreate(etype, False, *args, **kw)
         self.tk.call(self._name, "element", "create", elementname, etype,
-            *specs, *opts)
+            spec, *opts)
 
 
     def element_names(self):
@@ -531,6 +546,9 @@ class Widget(tkinter.Widget):
             readonly, alternate, invalid
         """
         master = setup_master(master)
+        if not getattr(master, '_tile_loaded', False):
+            # Load tile now, if needed
+            _load_tile(master)
         tkinter.Widget.__init__(self, master, widgetname, kw=kw)
 
 
@@ -551,7 +569,7 @@ class Widget(tkinter.Widget):
         matches statespec. statespec is expected to be a sequence."""
         ret = self.tk.getboolean(
                 self.tk.call(self._w, "instate", ' '.join(statespec)))
-        if ret and callback is not None:
+        if ret and callback:
             return callback(*args, **kw)
 
         return ret
@@ -690,10 +708,7 @@ class Combobox(Entry):
         returns the index of the current value in the list of values
         or -1 if the current value does not appear in the list."""
         if newindex is None:
-            res = self.tk.call(self._w, "current")
-            if res == '':
-                return -1
-            return self.tk.getint(res)
+            return self.tk.getint(self.tk.call(self._w, "current"))
         return self.tk.call(self._w, "current", newindex)
 
 
@@ -1525,7 +1540,7 @@ class LabeledScale(Frame):
         self.label.place(anchor='n' if label_side == 'top' else 's')
 
         # update the label as scale or variable changes
-        self.__tracecb = self._variable.trace_add('write', self._adjust)
+        self.__tracecb = self._variable.trace_variable('w', self._adjust)
         self.bind('<Configure>', self._adjust)
         self.bind('<Map>', self._adjust)
 
@@ -1533,7 +1548,7 @@ class LabeledScale(Frame):
     def destroy(self):
         """Destroy this widget and possibly its associated variable."""
         try:
-            self._variable.trace_remove('write', self.__tracecb)
+            self._variable.trace_vdelete('w', self.__tracecb)
         except AttributeError:
             pass
         else:

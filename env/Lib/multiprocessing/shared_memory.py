@@ -23,7 +23,6 @@ else:
     import _posixshmem
     _USE_POSIX = True
 
-from . import resource_tracker
 
 _O_CREX = os.O_CREAT | os.O_EXCL
 
@@ -71,9 +70,8 @@ class SharedMemory:
     _flags = os.O_RDWR
     _mode = 0o600
     _prepend_leading_slash = True if _USE_POSIX else False
-    _track = True
 
-    def __init__(self, name=None, create=False, size=0, *, track=True):
+    def __init__(self, name=None, create=False, size=0):
         if not size >= 0:
             raise ValueError("'size' must be a positive integer")
         if create:
@@ -83,7 +81,6 @@ class SharedMemory:
         if name is None and not self._flags & os.O_EXCL:
             raise ValueError("'name' can only be None if create=True")
 
-        self._track = track
         if _USE_POSIX:
 
             # POSIX Shared Memory
@@ -118,8 +115,9 @@ class SharedMemory:
             except OSError:
                 self.unlink()
                 raise
-            if self._track:
-                resource_tracker.register(self._name, "shared_memory")
+
+            from .resource_tracker import register
+            register(self._name, "shared_memory")
 
         else:
 
@@ -175,10 +173,7 @@ class SharedMemory:
                     )
                 finally:
                     _winapi.CloseHandle(h_map)
-                try:
-                    size = _winapi.VirtualQuerySize(p_buf)
-                finally:
-                    _winapi.UnmapViewOfFile(p_buf)
+                size = _winapi.VirtualQuerySize(p_buf)
                 self._mmap = mmap.mmap(-1, size, tagname=name)
 
         self._size = size
@@ -238,20 +233,13 @@ class SharedMemory:
     def unlink(self):
         """Requests that the underlying shared memory block be destroyed.
 
-        Unlink should be called once (and only once) across all handles
-        which have access to the shared memory block, even if these
-        handles belong to different processes. Closing and unlinking may
-        happen in any order, but trying to access data inside a shared
-        memory block after unlinking may result in memory errors,
-        depending on platform.
-
-        This method has no effect on Windows, where the only way to
-        delete a shared memory block is to close all handles."""
-
+        In order to ensure proper cleanup of resources, unlink should be
+        called once (and only once) across all processes which have access
+        to the shared memory block."""
         if _USE_POSIX and self._name:
+            from .resource_tracker import unregister
             _posixshmem.shm_unlink(self._name)
-            if self._track:
-                resource_tracker.unregister(self._name, "shared_memory")
+            unregister(self._name, "shared_memory")
 
 
 _encoding = "utf8"

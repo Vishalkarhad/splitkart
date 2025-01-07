@@ -1,4 +1,4 @@
-prefix=D:/project22/splitkart/env/Library 
+prefix=D:/project22/click_share/venv/Library 
 exec_prefix=${prefix}
 libdir=${exec_prefix}/lib
 includedir=${prefix}/include

@@ -2,7 +2,7 @@ import os
 import sysconfig
 
 
-def _reset_tzpath(to=None, stacklevel=4):
+def reset_tzpath(to=None):
     global TZPATH
 
     tzpaths = to
@@ -18,22 +18,17 @@ def _reset_tzpath(to=None, stacklevel=4):
         base_tzpath = tzpaths
     else:
         env_var = os.environ.get("PYTHONTZPATH", None)
-        if env_var is None:
-            env_var = sysconfig.get_config_var("TZPATH")
-        base_tzpath = _parse_python_tzpath(env_var, stacklevel)
+        if env_var is not None:
+            base_tzpath = _parse_python_tzpath(env_var)
+        else:
+            base_tzpath = _parse_python_tzpath(
+                sysconfig.get_config_var("TZPATH")
+            )
 
     TZPATH = tuple(base_tzpath)
 
 
-def reset_tzpath(to=None):
-    """Reset global TZPATH."""
-    # We need `_reset_tzpath` helper function because it produces a warning,
-    # it is used as both a module-level call and a public API.
-    # This is how we equalize the stacklevel for both calls.
-    _reset_tzpath(to)
-
-
-def _parse_python_tzpath(env_var, stacklevel):
+def _parse_python_tzpath(env_var):
     if not env_var:
         return ()
 
@@ -50,7 +45,6 @@ def _parse_python_tzpath(env_var, stacklevel):
             "Invalid paths specified in PYTHONTZPATH environment variable. "
             + msg,
             InvalidTZPathWarning,
-            stacklevel=stacklevel,
         )
 
     return new_tzpath
@@ -124,7 +118,7 @@ def available_timezones():
     # Start with loading from the tzdata package if it exists: this has a
     # pre-assembled list of zones that only requires opening one file.
     try:
-        with resources.files("tzdata").joinpath("zones").open("r") as f:
+        with resources.open_text("tzdata", "zones") as f:
             for zone in f:
                 zone = zone.strip()
                 if zone:
@@ -178,4 +172,4 @@ class InvalidTZPathWarning(RuntimeWarning):
 
 
 TZPATH = ()
-_reset_tzpath(stacklevel=5)
+reset_tzpath()

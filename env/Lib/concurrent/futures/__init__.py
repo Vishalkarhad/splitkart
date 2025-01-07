@@ -23,7 +23,6 @@ __all__ = (
     'ALL_COMPLETED',
     'CancelledError',
     'TimeoutError',
-    'InvalidStateError',
     'BrokenExecutor',
     'Future',
     'Executor',
@@ -51,4 +50,4 @@ def __getattr__(name):
         ThreadPoolExecutor = te
         return te
 
-    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+    raise AttributeError(f"module {__name__} has no attribute {name}")

@@ -1,18 +1,10 @@
 "Test , coverage 17%."
 
-from idlelib import iomenu
+from idlelib import iomenu, util
 import unittest
 from test.support import requires
 from tkinter import Tk
 from idlelib.editor import EditorWindow
-from idlelib import util
-from idlelib.idle_test.mock_idle import Func
-
-# Fail if either tokenize.open and t.detect_encoding does not exist.
-# These are used in loadfile and encode.
-# Also used in pyshell.MI.execfile and runscript.tabnanny.
-from tokenize import open, detect_encoding
-# Remove when we have proper tests that use both.
 
 
 class IOBindingTest(unittest.TestCase):
@@ -44,14 +36,9 @@ class IOBindingTest(unittest.TestCase):
         io = self.io
         fix = io.fixnewlines
         text = io.editwin.text
-
-        # Make the editor temporarily look like Shell.
         self.editwin.interp = None
-        shelltext = '>>> if 1'
-        self.editwin.get_prompt_text = Func(result=shelltext)
-        eq(fix(), shelltext)  # Get... call and '\n' not added.
-        del self.editwin.interp, self.editwin.get_prompt_text
-
+        eq(fix(), '')
+        del self.editwin.interp
         text.insert(1.0, 'a')
         eq(fix(), 'a'+io.eol_convention)
         eq(text.get('1.0', 'end-1c'), 'a\n')

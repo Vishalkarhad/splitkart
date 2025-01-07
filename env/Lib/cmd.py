@@ -42,7 +42,7 @@ listings of documented functions, miscellaneous topics, and undocumented
 functions respectively.
 """
 
-import inspect, string, sys
+import string, sys
 
 __all__ = ["Cmd"]
 
@@ -108,15 +108,7 @@ class Cmd:
                 import readline
                 self.old_completer = readline.get_completer()
                 readline.set_completer(self.complete)
-                if readline.backend == "editline":
-                    if self.completekey == 'tab':
-                        # libedit uses "^I" instead of "tab"
-                        command_string = "bind ^I rl_complete"
-                    else:
-                        command_string = f"bind {self.completekey} rl_complete"
-                else:
-                    command_string = f"{self.completekey}: complete"
-                readline.parse_and_bind(command_string)
+                readline.parse_and_bind(self.completekey+": complete")
             except ImportError:
                 pass
         try:
@@ -218,8 +210,9 @@ class Cmd:
         if cmd == '':
             return self.default(line)
         else:
-            func = getattr(self, 'do_' + cmd, None)
-            if func is None:
+            try:
+                func = getattr(self, 'do_' + cmd)
+            except AttributeError:
                 return self.default(line)
             return func(arg)
 
@@ -305,7 +298,6 @@ class Cmd:
             except AttributeError:
                 try:
                     doc=getattr(self, 'do_' + arg).__doc__
-                    doc = inspect.cleandoc(doc)
                     if doc:
                         self.stdout.write("%s\n"%str(doc))
                         return
@@ -318,10 +310,10 @@ class Cmd:
             names = self.get_names()
             cmds_doc = []
             cmds_undoc = []
-            topics = set()
+            help = {}
             for name in names:
                 if name[:5] == 'help_':
-                    topics.add(name[5:])
+                    help[name[5:]]=1
             names.sort()
             # There can be duplicates if routines overridden
             prevname = ''
@@ -331,16 +323,16 @@ class Cmd:
                         continue
                     prevname = name
                     cmd=name[3:]
-                    if cmd in topics:
+                    if cmd in help:
                         cmds_doc.append(cmd)
-                        topics.remove(cmd)
+                        del help[cmd]
                     elif getattr(self, name).__doc__:
                         cmds_doc.append(cmd)
                     else:
                         cmds_undoc.append(cmd)
             self.stdout.write("%s\n"%str(self.doc_leader))
             self.print_topics(self.doc_header,   cmds_doc,   15,80)
-            self.print_topics(self.misc_header,  sorted(topics),15,80)
+            self.print_topics(self.misc_header,  list(help.keys()),15,80)
             self.print_topics(self.undoc_header, cmds_undoc, 15,80)
 
     def print_topics(self, header, cmds, cmdlen, maxcol):

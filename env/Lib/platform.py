@@ -5,13 +5,12 @@
 
     If called from the command line, it prints the platform
     information concatenated as single string to stdout. The output
-    format is usable as part of a filename.
+    format is useable as part of a filename.
 
 """
 #    This module is maintained by Marc-Andre Lemburg <mal@egenix.com>.
 #    If you find problems, please submit bug reports/patches via the
-#    Python issue tracker (https://github.com/python/cpython/issues) and
-#    mention "@malemburg".
+#    Python bug tracker (http://bugs.python.org) and assign them to "lemburg".
 #
 #    Still needed:
 #    * support for MS-DOS (PythonDX ?)
@@ -117,12 +116,9 @@ import collections
 import os
 import re
 import sys
+import subprocess
 import functools
 import itertools
-try:
-    import _wmi
-except ImportError:
-    _wmi = None
 
 ### Globals & Constants
 
@@ -141,11 +137,11 @@ _ver_stages = {
     'pl': 200, 'p': 200,
 }
 
+_component_re = re.compile(r'([0-9]+|[._+-])')
 
 def _comparable_version(version):
-    component_re = re.compile(r'([0-9]+|[._+-])')
     result = []
-    for v in component_re.split(version):
+    for v in _component_re.split(version):
         if v not in '._+-':
             try:
                 v = int(v, 10)
@@ -157,6 +153,11 @@ def _comparable_version(version):
 
 ### Platform specific APIs
 
+_libc_search = re.compile(b'(__libc_init)'
+                          b'|'
+                          b'(GLIBC_([0-9.]+))'
+                          b'|'
+                          br'(libc(_\w+)?\.so(?:\.(\d[0-9.]*))?)', re.ASCII)
 
 def libc_ver(executable=None, lib='', version='', chunksize=16384):
 
@@ -168,12 +169,12 @@ def libc_ver(executable=None, lib='', version='', chunksize=16384):
 
         Note that the function has intimate knowledge of how different
         libc versions add symbols to the executable and thus is probably
-        only usable for executables compiled using gcc.
+        only useable for executables compiled using gcc.
 
         The file is read and scanned in chunks of chunksize bytes.
 
     """
-    if not executable:
+    if executable is None:
         try:
             ver = os.confstr('CS_GNU_LIBC_VERSION')
             # parse 'glibc 2.28' as ('glibc', '2.28')
@@ -186,27 +187,18 @@ def libc_ver(executable=None, lib='', version='', chunksize=16384):
 
         executable = sys.executable
 
-        if not executable:
-            # sys.executable is not set.
-            return lib, version
-
-    libc_search = re.compile(b'(__libc_init)'
-                          b'|'
-                          b'(GLIBC_([0-9.]+))'
-                          b'|'
-                          br'(libc(_\w+)?\.so(?:\.(\d[0-9.]*))?)', re.ASCII)
-
     V = _comparable_version
-    # We use os.path.realpath()
-    # here to work around problems with Cygwin not being
-    # able to open symlinks for reading
-    executable = os.path.realpath(executable)
+    if hasattr(os.path, 'realpath'):
+        # Python 2.2 introduced os.path.realpath(); it is used
+        # here to work around problems with Cygwin not being
+        # able to open symlinks for reading
+        executable = os.path.realpath(executable)
     with open(executable, 'rb') as f:
         binary = f.read(chunksize)
         pos = 0
         while pos < len(binary):
             if b'libc' in binary or b'GLIBC' in binary:
-                m = libc_search.search(binary, pos)
+                m = _libc_search.search(binary, pos)
             else:
                 m = None
             if not m or m.end() == len(binary):
@@ -253,6 +245,9 @@ def _norm_version(version, build=''):
     version = '.'.join(strings[:3])
     return version
 
+_ver_output = re.compile(r'(?:([\w ]+) ([\w.]+) '
+                         r'.*'
+                         r'\[.* ([\d.]+)\])')
 
 # Examples of VER command output:
 #
@@ -288,7 +283,6 @@ def _syscmd_ver(system='', release='', version='',
                                            stdin=subprocess.DEVNULL,
                                            stderr=subprocess.DEVNULL,
                                            text=True,
-                                           encoding="locale",
                                            shell=True)
         except (OSError, subprocess.CalledProcessError) as why:
             #print('Command %s failed: %s' % (cmd, why))
@@ -298,13 +292,9 @@ def _syscmd_ver(system='', release='', version='',
     else:
         return system, release, version
 
-    ver_output = re.compile(r'(?:([\w ]+) ([\w.]+) '
-                         r'.*'
-                         r'\[.* ([\d.]+)\])')
-
     # Parse the output
     info = info.strip()
-    m = ver_output.match(info)
+    m = _ver_output.match(info)
     if m is not None:
         system, release, version = m.groups()
         # Strip trailing dots from version and release
@@ -317,61 +307,44 @@ def _syscmd_ver(system='', release='', version='',
         version = _norm_version(version)
     return system, release, version
 
+_WIN32_CLIENT_RELEASES = {
+    (5, 0): "2000",
+    (5, 1): "XP",
+    # Strictly, 5.2 client is XP 64-bit, but platform.py historically
+    # has always called it 2003 Server
+    (5, 2): "2003Server",
+    (5, None): "post2003",
 
-def _wmi_query(table, *keys):
-    global _wmi
-    if not _wmi:
-        raise OSError("not supported")
-    table = {
-        "OS": "Win32_OperatingSystem",
-        "CPU": "Win32_Processor",
-    }[table]
-    try:
-        data = _wmi.exec_query("SELECT {} FROM {}".format(
-            ",".join(keys),
-            table,
-        )).split("\0")
-    except OSError:
-        _wmi = None
-        raise OSError("not supported")
-    split_data = (i.partition("=") for i in data)
-    dict_data = {i[0]: i[2] for i in split_data}
-    return (dict_data[k] for k in keys)
+    (6, 0): "Vista",
+    (6, 1): "7",
+    (6, 2): "8",
+    (6, 3): "8.1",
+    (6, None): "post8.1",
 
+    (10, 0): "10",
+    (10, None): "post10",
+}
 
-_WIN32_CLIENT_RELEASES = [
-    ((10, 1, 0), "post11"),
-    ((10, 0, 22000), "11"),
-    ((6, 4, 0), "10"),
-    ((6, 3, 0), "8.1"),
-    ((6, 2, 0), "8"),
-    ((6, 1, 0), "7"),
-    ((6, 0, 0), "Vista"),
-    ((5, 2, 3790), "XP64"),
-    ((5, 2, 0), "XPMedia"),
-    ((5, 1, 0), "XP"),
-    ((5, 0, 0), "2000"),
-]
+# Server release name lookup will default to client names if necessary
+_WIN32_SERVER_RELEASES = {
+    (5, 2): "2003Server",
 
-_WIN32_SERVER_RELEASES = [
-    ((10, 1, 0), "post2022Server"),
-    ((10, 0, 20348), "2022Server"),
-    ((10, 0, 17763), "2019Server"),
-    ((6, 4, 0), "2016Server"),
-    ((6, 3, 0), "2012ServerR2"),
-    ((6, 2, 0), "2012Server"),
-    ((6, 1, 0), "2008ServerR2"),
-    ((6, 0, 0), "2008Server"),
-    ((5, 2, 0), "2003Server"),
-    ((5, 0, 0), "2000Server"),
-]
+    (6, 0): "2008Server",
+    (6, 1): "2008ServerR2",
+    (6, 2): "2012Server",
+    (6, 3): "2012ServerR2",
+    (6, None): "post2012ServerR2",
+}
 
 def win32_is_iot():
     return win32_edition() in ('IoTUAP', 'NanoServer', 'WindowsCoreHeadless', 'IoTEdgeOS')
 
 def win32_edition():
     try:
-        import winreg
+        try:
+            import winreg
+        except ImportError:
+            import _winreg as winreg
     except ImportError:
         pass
     else:
@@ -384,40 +357,22 @@ def win32_edition():
 
     return None
 
-def _win32_ver(version, csd, ptype):
-    # Try using WMI first, as this is the canonical source of data
-    try:
-        (version, product_type, ptype, spmajor, spminor)  = _wmi_query(
-            'OS',
-            'Version',
-            'ProductType',
-            'BuildType',
-            'ServicePackMajorVersion',
-            'ServicePackMinorVersion',
-        )
-        is_client = (int(product_type) == 1)
-        if spminor and spminor != '0':
-            csd = f'SP{spmajor}.{spminor}'
-        else:
-            csd = f'SP{spmajor}'
-        return version, csd, ptype, is_client
-    except OSError:
-        pass
-
-    # Fall back to a combination of sys.getwindowsversion and "ver"
+def win32_ver(release='', version='', csd='', ptype=''):
     try:
         from sys import getwindowsversion
     except ImportError:
-        return version, csd, ptype, True
+        return release, version, csd, ptype
 
     winver = getwindowsversion()
-    is_client = (getattr(winver, 'product_type', 1) == 1)
     try:
-        version = _syscmd_ver()[2]
-        major, minor, build = map(int, version.split('.'))
+        major, minor, build = map(int, _syscmd_ver()[2].split('.'))
     except ValueError:
         major, minor, build = winver.platform_version or winver[:3]
-        version = '{0}.{1}.{2}'.format(major, minor, build)
+    version = '{0}.{1}.{2}'.format(major, minor, build)
+
+    release = (_WIN32_CLIENT_RELEASES.get((major, minor)) or
+               _WIN32_CLIENT_RELEASES.get((major, None)) or
+               release)
 
     # getwindowsversion() reflect the compatibility mode Python is
     # running under, and so the service pack value is only going to be
@@ -429,8 +384,17 @@ def _win32_ver(version, csd, ptype):
             if csd[:13] == 'Service Pack ':
                 csd = 'SP' + csd[13:]
 
+    # VER_NT_SERVER = 3
+    if getattr(winver, 'product_type', None) == 3:
+        release = (_WIN32_SERVER_RELEASES.get((major, minor)) or
+                   _WIN32_SERVER_RELEASES.get((major, None)) or
+                   release)
+
     try:
-        import winreg
+        try:
+            import winreg
+        except ImportError:
+            import _winreg as winreg
     except ImportError:
         pass
     else:
@@ -441,25 +405,18 @@ def _win32_ver(version, csd, ptype):
         except OSError:
             pass
 
-    return version, csd, ptype, is_client
-
-def win32_ver(release='', version='', csd='', ptype=''):
-    is_client = False
-
-    version, csd, ptype, is_client = _win32_ver(version, csd, ptype)
-
-    if version:
-        intversion = tuple(map(int, version.split('.')))
-        releases = _WIN32_CLIENT_RELEASES if is_client else _WIN32_SERVER_RELEASES
-        release = next((r for v, r in releases if v <= intversion), release)
-
     return release, version, csd, ptype
 
 
 def _mac_ver_xml():
     fn = '/System/Library/CoreServices/SystemVersion.plist'
     if not os.path.exists(fn):
-        return None
+        if 'SDKROOT' in os.environ:
+            fn = os.environ['SDKROOT'] + fn
+            if not os.path.exists(fn):
+                return None
+        else:
+            return None
 
     try:
         import plistlib
@@ -497,32 +454,8 @@ def mac_ver(release='', versioninfo=('', '', ''), machine=''):
     # If that also doesn't work return the default values
     return release, versioninfo, machine
 
-
-# A namedtuple for iOS version information.
-IOSVersionInfo = collections.namedtuple(
-    "IOSVersionInfo",
-    ["system", "release", "model", "is_simulator"]
-)
-
-
-def ios_ver(system="", release="", model="", is_simulator=False):
-    """Get iOS version information, and return it as a namedtuple:
-        (system, release, model, is_simulator).
-
-    If values can't be determined, they are set to values provided as
-    parameters.
-    """
-    if sys.platform == "ios":
-        import _ios_support
-        result = _ios_support.get_platform_ios()
-        if result is not None:
-            return IOSVersionInfo(*result)
-
-    return IOSVersionInfo(system, release, model, is_simulator)
-
-
 def _java_getprop(name, default):
-    """This private helper is deprecated in 3.13 and will be removed in 3.15"""
+
     from java.lang import System
     try:
         value = System.getProperty(name)
@@ -544,8 +477,6 @@ def java_ver(release='', vendor='', vminfo=('', '', ''), osinfo=('', '', '')):
         given as parameters (which all default to '').
 
     """
-    import warnings
-    warnings._deprecated('java_ver', remove=(3, 15))
     # Import the needed APIs
     try:
         import java.lang
@@ -566,47 +497,6 @@ def java_ver(release='', vendor='', vminfo=('', '', ''), osinfo=('', '', '')):
     osinfo = os_name, os_version, os_arch
 
     return release, vendor, vminfo, osinfo
-
-
-AndroidVer = collections.namedtuple(
-    "AndroidVer", "release api_level manufacturer model device is_emulator")
-
-def android_ver(release="", api_level=0, manufacturer="", model="", device="",
-                is_emulator=False):
-    if sys.platform == "android":
-        try:
-            from ctypes import CDLL, c_char_p, create_string_buffer
-        except ImportError:
-            pass
-        else:
-            # An NDK developer confirmed that this is an officially-supported
-            # API (https://stackoverflow.com/a/28416743). Use `getattr` to avoid
-            # private name mangling.
-            system_property_get = getattr(CDLL("libc.so"), "__system_property_get")
-            system_property_get.argtypes = (c_char_p, c_char_p)
-
-            def getprop(name, default):
-                # https://android.googlesource.com/platform/bionic/+/refs/tags/android-5.0.0_r1/libc/include/sys/system_properties.h#39
-                PROP_VALUE_MAX = 92
-                buffer = create_string_buffer(PROP_VALUE_MAX)
-                length = system_property_get(name.encode("UTF-8"), buffer)
-                if length == 0:
-                    # This API doesn’t distinguish between an empty property and
-                    # a missing one.
-                    return default
-                else:
-                    return buffer.value.decode("UTF-8", "backslashreplace")
-
-            release = getprop("ro.build.version.release", release)
-            api_level = int(getprop("ro.build.version.sdk", api_level))
-            manufacturer = getprop("ro.product.manufacturer", manufacturer)
-            model = getprop("ro.product.model", model)
-            device = getprop("ro.product.device", device)
-            is_emulator = getprop("ro.kernel.qemu", "0") == "1"
-
-    return AndroidVer(
-        release, api_level, manufacturer, model, device, is_emulator)
-
 
 ### System name aliasing
 
@@ -641,6 +531,16 @@ def system_alias(system, release, version):
             # XXX Whatever the new SunOS marketing name is...
             system = 'Solaris'
 
+    elif system == 'IRIX64':
+        # IRIX reports IRIX64 on platforms with 64-bit support; yet it
+        # is really a version and not a different platform, since 32-bit
+        # apps are also supported..
+        system = 'IRIX'
+        if version:
+            version = version + ' (64bit)'
+        else:
+            version = '64bit'
+
     elif system in ('win32', 'win16'):
         # In case one of the other tricks
         system = 'Windows'
@@ -674,12 +574,12 @@ def _platform(*args):
     platform = platform.replace('unknown', '')
 
     # Fold '--'s and remove trailing '-'
-    while True:
+    while 1:
         cleaned = platform.replace('--', '-')
         if cleaned == platform:
             break
         platform = cleaned
-    while platform and platform[-1] == '-':
+    while platform[-1] == '-':
         platform = platform[:-1]
 
     return platform
@@ -720,14 +620,11 @@ def _syscmd_file(target, default=''):
         default in case the command should fail.
 
     """
-    if sys.platform in {'dos', 'win32', 'win16', 'ios', 'tvos', 'watchos'}:
+    if sys.platform in ('dos', 'win32', 'win16'):
         # XXX Others too ?
         return default
 
-    try:
-        import subprocess
-    except ImportError:
-        return default
+    import subprocess
     target = _follow_symlinks(target)
     # "file" output is locale dependent: force the usage of the C locale
     # to get deterministic behavior.
@@ -808,14 +705,15 @@ def architecture(executable=sys.executable, bits='', linkage=''):
     # Bits
     if '32-bit' in fileout:
         bits = '32bit'
+    elif 'N32' in fileout:
+        # On Irix only
+        bits = 'n32bit'
     elif '64-bit' in fileout:
         bits = '64bit'
 
     # Linkage
     if 'ELF' in fileout:
         linkage = 'ELF'
-    elif 'Mach-O' in fileout:
-        linkage = "Mach-O"
     elif 'PE' in fileout:
         # E.g. Windows uses this format
         if 'Windows' in fileout:
@@ -840,21 +738,6 @@ def _get_machine_win32():
     # http://www.geocities.com/rick_lively/MANUALS/ENV/MSWIN/PROCESSI.HTM
 
     # WOW64 processes mask the native architecture
-    try:
-        [arch, *_] = _wmi_query('CPU', 'Architecture')
-    except OSError:
-        pass
-    else:
-        try:
-            arch = ['x86', 'MIPS', 'Alpha', 'PowerPC', None,
-                    'ARM', 'ia64', None, None,
-                    'AMD64', None, None, 'ARM64',
-            ][int(arch)]
-        except (ValueError, IndexError):
-            pass
-        else:
-            if arch:
-                return arch
     return (
         os.environ.get('PROCESSOR_ARCHITEW6432', '') or
         os.environ.get('PROCESSOR_ARCHITECTURE', '')
@@ -868,12 +751,7 @@ class _Processor:
         return func() or ''
 
     def get_win32():
-        try:
-            manufacturer, caption = _wmi_query('CPU', 'Manufacturer', 'Caption')
-        except OSError:
-            return os.environ.get('PROCESSOR_IDENTIFIER', _get_machine_win32())
-        else:
-            return f'{caption}, {manufacturer}'
+        return os.environ.get('PROCESSOR_IDENTIFIER', _get_machine_win32())
 
     def get_OpenVMS():
         try:
@@ -884,28 +762,15 @@ class _Processor:
             csid, cpu_number = vms_lib.getsyi('SYI$_CPU', 0)
             return 'Alpha' if cpu_number >= 128 else 'VAX'
 
-    # On the iOS simulator, os.uname returns the architecture as uname.machine.
-    # On device it returns the model name for some reason; but there's only one
-    # CPU architecture for iOS devices, so we know the right answer.
-    def get_ios():
-        if sys.implementation._multiarch.endswith("simulator"):
-            return os.uname().machine
-        return 'arm64'
-
     def from_subprocess():
         """
         Fall back to `uname -p`
         """
         try:
-            import subprocess
-        except ImportError:
-            return None
-        try:
             return subprocess.check_output(
                 ['uname', '-p'],
                 stderr=subprocess.DEVNULL,
                 text=True,
-                encoding="utf8",
             ).strip()
         except (OSError, subprocess.CalledProcessError):
             pass
@@ -929,8 +794,6 @@ class uname_result(
     except when needed.
     """
 
-    _fields = ('system', 'node', 'release', 'version', 'machine', 'processor')
-
     @functools.cached_property
     def processor(self):
         return _unknown_as_blank(_Processor.get())
@@ -944,7 +807,7 @@ class uname_result(
     @classmethod
     def _make(cls, iterable):
         # override factory to affect length check
-        num_fields = len(cls._fields) - 1
+        num_fields = len(cls._fields)
         result = cls.__new__(cls, *iterable)
         if len(result) != num_fields + 1:
             msg = f'Expected {num_fields} arguments, got {len(result)}'
@@ -958,7 +821,7 @@ class uname_result(
         return len(tuple(iter(self)))
 
     def __reduce__(self):
-        return uname_result, tuple(self)[:len(self._fields) - 1]
+        return uname_result, tuple(self)[:len(self._fields)]
 
 
 _uname_cache = None
@@ -1046,15 +909,6 @@ def uname():
         system = 'Windows'
         release = 'Vista'
 
-    # On Android, return the name and version of the OS rather than the kernel.
-    if sys.platform == 'android':
-        system = 'Android'
-        release = android_ver().release
-
-    # Normalize responses on iOS
-    if sys.platform == 'ios':
-        system, release, _, _ = ios_ver()
-
     vals = system, node, release, version, machine
     # Replace 'unknown' values with the more portable ''
     _uname_cache = uname_result(*map(_unknown_as_blank, vals))
@@ -1122,6 +976,32 @@ def processor():
 
 ### Various APIs for extracting information from sys.version
 
+_sys_version_parser = re.compile(
+    r'([\w.+]+)\s*'  # "version<space>"
+    r'\(#?([^,]+)'  # "(#buildno"
+    r'(?:,\s*([\w ]*)'  # ", builddate"
+    r'(?:,\s*([\w :]*))?)?\)\s*'  # ", buildtime)<space>"
+    r'\[([^\]]+)\]?', re.ASCII)  # "[compiler]"
+
+_ironpython_sys_version_parser = re.compile(
+    r'IronPython\s*'
+    r'([\d\.]+)'
+    r'(?: \(([\d\.]+)\))?'
+    r' on (.NET [\d\.]+)', re.ASCII)
+
+# IronPython covering 2.6 and 2.7
+_ironpython26_sys_version_parser = re.compile(
+    r'([\d.]+)\s*'
+    r'\(IronPython\s*'
+    r'[\d.]+\s*'
+    r'\(([\d.]+)\) on ([\w.]+ [\d.]+(?: \(\d+-bit\))?)\)'
+)
+
+_pypy_sys_version_parser = re.compile(
+    r'([\w.+]+)\s*'
+    r'\(#?([^,]+),\s*([\w ]+),\s*([\w :]+)\)\s*'
+    r'\[PyPy [^\]]+\]?')
+
 _sys_version_cache = {}
 
 def _sys_version(sys_version=None):
@@ -1153,16 +1033,28 @@ def _sys_version(sys_version=None):
     if result is not None:
         return result
 
-    if sys.platform.startswith('java'):
+    # Parse it
+    if 'IronPython' in sys_version:
+        # IronPython
+        name = 'IronPython'
+        if sys_version.startswith('IronPython'):
+            match = _ironpython_sys_version_parser.match(sys_version)
+        else:
+            match = _ironpython26_sys_version_parser.match(sys_version)
+
+        if match is None:
+            raise ValueError(
+                'failed to parse IronPython sys.version: %s' %
+                repr(sys_version))
+
+        version, alt_version, compiler = match.groups()
+        buildno = ''
+        builddate = ''
+
+    elif sys.platform.startswith('java'):
         # Jython
-        jython_sys_version_parser = re.compile(
-            r'([\w.+]+)\s*'  # "version<space>"
-            r'\(#?([^,]+)'  # "(#buildno"
-            r'(?:,\s*([\w ]*)'  # ", builddate"
-            r'(?:,\s*([\w :]*))?)?\)\s*'  # ", buildtime)<space>"
-            r'\[([^\]]+)\]?', re.ASCII)  # "[compiler]"
         name = 'Jython'
-        match = jython_sys_version_parser.match(sys_version)
+        match = _sys_version_parser.match(sys_version)
         if match is None:
             raise ValueError(
                 'failed to parse Jython sys.version: %s' %
@@ -1174,13 +1066,8 @@ def _sys_version(sys_version=None):
 
     elif "PyPy" in sys_version:
         # PyPy
-        pypy_sys_version_parser = re.compile(
-            r'([\w.+]+)\s*'
-            r'\(#?([^,]+),\s*([\w ]+),\s*([\w :]+)\)\s*'
-            r'\[PyPy [^\]]+\]?')
-
         name = "PyPy"
-        match = pypy_sys_version_parser.match(sys_version)
+        match = _pypy_sys_version_parser.match(sys_version)
         if match is None:
             raise ValueError("failed to parse PyPy sys.version: %s" %
                              repr(sys_version))
@@ -1189,14 +1076,7 @@ def _sys_version(sys_version=None):
 
     else:
         # CPython
-        cpython_sys_version_parser = re.compile(
-            r'([\w.+]+)\s*(?:\ \|\ packaged\ by\ Anaconda,\ Inc\.\ \|)?\s*'  # version<space>"
-            r'(?:experimental free-threading build\s+)?' # "free-threading-build<space>"
-            r'\(#?([^,]+)'  # "(#buildno"
-            r'(?:,\s*([\w ]*)'  # ", builddate"
-            r'(?:,\s*([\w :]*))?)?\)\s*'  # ", buildtime)<space>"
-            r'\[([^\]]+)\]?', re.ASCII)  # "[compiler]"
-        match = cpython_sys_version_parser.match(sys_version)
+        match = _sys_version_parser.match(sys_version)
         if match is None:
             raise ValueError(
                 'failed to parse CPython sys.version: %s' %
@@ -1234,6 +1114,7 @@ def python_implementation():
 
         Currently, the following implementations are identified:
           'CPython' (C implementation of Python),
+          'IronPython' (.NET implementation of Python),
           'Jython' (Java implementation of Python),
           'PyPy' (Python implementation of Python).
 
@@ -1308,7 +1189,7 @@ def python_compiler():
 
 _platform_cache = {}
 
-def platform(aliased=False, terse=False):
+def platform(aliased=0, terse=0):
 
     """ Returns a single string identifying the underlying platform
         with as much useful information as possible (but no more :).
@@ -1340,14 +1221,11 @@ def platform(aliased=False, terse=False):
         system, release, version = system_alias(system, release, version)
 
     if system == 'Darwin':
-        # macOS and iOS both report as a "Darwin" kernel
-        if sys.platform == "ios":
-            system, release, _, _ = ios_ver()
-        else:
-            macos_release = mac_ver()[0]
-            if macos_release:
-                system = 'macOS'
-                release = macos_release
+        # macOS (darwin kernel)
+        macos_release = mac_ver()[0]
+        if macos_release:
+            system = 'macOS'
+            release = macos_release
 
     if system == 'Windows':
         # MS platforms
@@ -1357,7 +1235,7 @@ def platform(aliased=False, terse=False):
         else:
             platform = _platform(system, release, version, csd)
 
-    elif system == 'Linux':
+    elif system in ('Linux',):
         # check for libc vs. glibc
         libcname, libcversion = libc_ver()
         platform = _platform(system, release, machine, processor,
@@ -1384,64 +1262,6 @@ def platform(aliased=False, terse=False):
 
     _platform_cache[(aliased, terse)] = platform
     return platform
-
-### freedesktop.org os-release standard
-# https://www.freedesktop.org/software/systemd/man/os-release.html
-
-# /etc takes precedence over /usr/lib
-_os_release_candidates = ("/etc/os-release", "/usr/lib/os-release")
-_os_release_cache = None
-
-
-def _parse_os_release(lines):
-    # These fields are mandatory fields with well-known defaults
-    # in practice all Linux distributions override NAME, ID, and PRETTY_NAME.
-    info = {
-        "NAME": "Linux",
-        "ID": "linux",
-        "PRETTY_NAME": "Linux",
-    }
-
-    # NAME=value with optional quotes (' or "). The regular expression is less
-    # strict than shell lexer, but that's ok.
-    os_release_line = re.compile(
-        "^(?P<name>[a-zA-Z0-9_]+)=(?P<quote>[\"\']?)(?P<value>.*)(?P=quote)$"
-    )
-    # unescape five special characters mentioned in the standard
-    os_release_unescape = re.compile(r"\\([\\\$\"\'`])")
-
-    for line in lines:
-        mo = os_release_line.match(line)
-        if mo is not None:
-            info[mo.group('name')] = os_release_unescape.sub(
-                r"\1", mo.group('value')
-            )
-
-    return info
-
-
-def freedesktop_os_release():
-    """Return operation system identification from freedesktop.org os-release
-    """
-    global _os_release_cache
-
-    if _os_release_cache is None:
-        errno = None
-        for candidate in _os_release_candidates:
-            try:
-                with open(candidate, encoding="utf-8") as f:
-                    _os_release_cache = _parse_os_release(f)
-                break
-            except OSError as e:
-                errno = e.errno
-        else:
-            raise OSError(
-                errno,
-                f"Unable to read files {', '.join(_os_release_candidates)}"
-            )
-
-    return _os_release_cache.copy()
-
 
 ### Command line interface
 

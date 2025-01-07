@@ -4,7 +4,7 @@
   "channel": "https://repo.anaconda.com/pkgs/main/win-64",
   "constrains": [],
   "depends": [],
-  "extracted_package_dir": "C:\\Users\\Vishal\\AppData\\Local\\Temp\\_MEI10842\\pkgs\\vs2015_runtime-14.42.34433-h9531ae6_2",
+  "extracted_package_dir": "C:\\Users\\Vishal\\AppData\\Local\\Temp\\_MEI179722\\pkgs\\vs2015_runtime-14.42.34433-h9531ae6_2",
   "files": [
     "Library/bin/api-ms-win-core-console-l1-1-0.dll",
     "Library/bin/api-ms-win-core-console-l1-2-0.dll",
@@ -118,12 +118,12 @@
   "fn": "vs2015_runtime-14.42.34433-h9531ae6_2.conda",
   "license": "",
   "link": {
-    "source": "C:\\Users\\Vishal\\AppData\\Local\\Temp\\_MEI10842\\pkgs\\vs2015_runtime-14.42.34433-h9531ae6_2",
+    "source": "C:\\Users\\Vishal\\AppData\\Local\\Temp\\_MEI179722\\pkgs\\vs2015_runtime-14.42.34433-h9531ae6_2",
     "type": 1
   },
   "md5": "4b7a61e3eff596a8a90aca817be3cf4f",
   "name": "vs2015_runtime",
-  "package_tarball_full_path": "C:\\Users\\Vishal\\AppData\\Local\\Temp\\_MEI10842\\pkgs\\vs2015_runtime-14.42.34433-h9531ae6_2.conda",
+  "package_tarball_full_path": "C:\\Users\\Vishal\\AppData\\Local\\Temp\\_MEI179722\\pkgs\\vs2015_runtime-14.42.34433-h9531ae6_2.conda",
   "paths_data": {
     "paths": [
       {

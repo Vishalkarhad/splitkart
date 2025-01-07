@@ -16,6 +16,12 @@ import functools
 
 __all__ = ["filter", "fnmatch", "fnmatchcase", "translate"]
 
+# Build a thread-safe incrementing counter to help create unique regexp group
+# names across calls.
+from itertools import count
+_nextgroupnum = count().__next__
+del count
+
 def fnmatch(name, pat):
     """Test whether FILENAME matches PATTERN.
 
@@ -35,7 +41,7 @@ def fnmatch(name, pat):
     pat = os.path.normcase(pat)
     return fnmatchcase(name, pat)
 
-@functools.lru_cache(maxsize=32768, typed=True)
+@functools.lru_cache(maxsize=256, typed=True)
 def _compile_pattern(pat):
     if isinstance(pat, bytes):
         pat_str = str(pat, 'ISO-8859-1')
@@ -78,11 +84,6 @@ def translate(pat):
     """
 
     STAR = object()
-    parts = _translate(pat, STAR, '.')
-    return _join_translated_parts(parts, STAR)
-
-
-def _translate(pat, STAR, QUESTION_MARK):
     res = []
     add = res.append
     i, n = 0, len(pat)
@@ -94,7 +95,7 @@ def _translate(pat, STAR, QUESTION_MARK):
             if (not res) or res[-1] is not STAR:
                 add(STAR)
         elif c == '?':
-            add(QUESTION_MARK)
+            add('.')
         elif c == '[':
             j = i
             if j < n and pat[j] == '!':
@@ -107,7 +108,7 @@ def _translate(pat, STAR, QUESTION_MARK):
                 add('\\[')
             else:
                 stuff = pat[i:j]
-                if '-' not in stuff:
+                if '--' not in stuff:
                     stuff = stuff.replace('\\', r'\\')
                 else:
                     chunks = []
@@ -119,16 +120,7 @@ def _translate(pat, STAR, QUESTION_MARK):
                         chunks.append(pat[i:k])
                         i = k+1
                         k = k+3
-                    chunk = pat[i:j]
-                    if chunk:
-                        chunks.append(chunk)
-                    else:
-                        chunks[-1] += '-'
-                    # Remove empty ranges -- invalid in RE.
-                    for k in range(len(chunks)-1, 0, -1):
-                        if chunks[k-1][-1] > chunks[k][0]:
-                            chunks[k-1] = chunks[k-1][:-1] + chunks[k][1:]
-                            del chunks[k]
+                    chunks.append(pat[i:j])
                     # Escape backslashes and hyphens for set difference (--).
                     # Hyphens that create ranges shouldn't be escaped.
                     stuff = '-'.join(s.replace('\\', r'\\').replace('-', r'\-')
@@ -136,26 +128,17 @@ def _translate(pat, STAR, QUESTION_MARK):
                 # Escape set operations (&&, ~~ and ||).
                 stuff = re.sub(r'([&~|])', r'\\\1', stuff)
                 i = j+1
-                if not stuff:
-                    # Empty range: never match.
-                    add('(?!)')
-                elif stuff == '!':
-                    # Negated empty range: match any character.
-                    add('.')
-                else:
-                    if stuff[0] == '!':
-                        stuff = '^' + stuff[1:]
-                    elif stuff[0] in ('^', '['):
-                        stuff = '\\' + stuff
-                    add(f'[{stuff}]')
+                if stuff[0] == '!':
+                    stuff = '^' + stuff[1:]
+                elif stuff[0] in ('^', '['):
+                    stuff = '\\' + stuff
+                add(f'[{stuff}]')
         else:
             add(re.escape(c))
     assert i == n
-    return res
 
-
-def _join_translated_parts(inp, STAR):
     # Deal with STARs.
+    inp = res
     res = []
     add = res.append
     i, n = 0, len(inp)
@@ -166,10 +149,17 @@ def _join_translated_parts(inp, STAR):
     # Now deal with STAR fixed STAR fixed ...
     # For an interior `STAR fixed` pairing, we want to do a minimal
     # .*? match followed by `fixed`, with no possibility of backtracking.
-    # Atomic groups ("(?>...)") allow us to spell that directly.
-    # Note: people rely on the undocumented ability to join multiple
-    # translate() results together via "|" to build large regexps matching
-    # "one of many" shell patterns.
+    # We can't spell that directly, but can trick it into working by matching
+    #    .*?fixed
+    # in a lookahead assertion, save the matched part in a group, then
+    # consume that group via a backreference. If the overall match fails,
+    # the lookahead assertion won't try alternatives. So the translation is:
+    #     (?=(?P<name>.*?fixed))(?P=name)
+    # Group names are created as needed: g0, g1, g2, ...
+    # The numbers are obtained from _nextgroupnum() to ensure they're unique
+    # across calls and across threads. This is because people rely on the
+    # undocumented ability to join multiple translate() results together via
+    # "|" to build large regexps matching "one of many" shell patterns.
     while i < n:
         assert inp[i] is STAR
         i += 1
@@ -186,7 +176,8 @@ def _join_translated_parts(inp, STAR):
             add(".*")
             add(fixed)
         else:
-            add(f"(?>.*?{fixed})")
+            groupnum = _nextgroupnum()
+            add(f"(?=(?P<g{groupnum}>.*?{fixed}))(?P=g{groupnum})")
     assert i == n
     res = "".join(res)
     return fr'(?s:{res})\Z'

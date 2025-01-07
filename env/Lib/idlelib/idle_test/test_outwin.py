@@ -1,7 +1,6 @@
 "Test outwin, coverage 76%."
 
 from idlelib import outwin
-import sys
 import unittest
 from test.support import requires
 from tkinter import Tk, Text
@@ -19,10 +18,6 @@ class OutputWindowTest(unittest.TestCase):
         root.withdraw()
         w = cls.window = outwin.OutputWindow(None, None, None, root)
         cls.text = w.text = Text(root)
-        if sys.platform == 'darwin':  # Issue 112938
-            cls.text.update = cls.text.update_idletasks
-            # Without this, test write, writelines, and goto... fail.
-            # The reasons and why macOS-specific are unclear.
 
     @classmethod
     def tearDownClass(cls):
@@ -164,7 +159,7 @@ class ModuleFunctionTest(unittest.TestCase):
         for line, expected_output in test_lines:
             self.assertEqual(flh(line), expected_output)
             if expected_output:
-                mock_open.assert_called_with(expected_output[0])
+                mock_open.assert_called_with(expected_output[0], 'r')
 
 
 if __name__ == '__main__':
