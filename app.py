@@ -281,6 +281,7 @@ def checkout():
 
     # Move cart items to the completed_orders collection
     code=generate_code()  # Generate a unique referral code
+    
     completed_order = {
             "user_id": user_id,
             "items": g_cart1,
@@ -291,10 +292,23 @@ def checkout():
             "use_code":g_referral_code,
             "minumum_buying_price":g_sharing_price,
             "payment_status": "success",
+            "pending":g_sharing_people,
               # Store additional payment details if available
             "order_date": datetime.utcnow()
         }
+    
     db.completed_orders.insert_one(completed_order)
+
+    filter = {"code":g_referral_code}
+    document = db.completed_orders.find_one(filter)
+    if document:
+        # Get the current value of sharing_people
+        current_pending = document.get("pending", 0)
+        updated_pending = current_pending - 1
+        update = {"$set": {"pending": updated_pending}}
+        result = db.completed_orders.update_one(filter, update)
+
+
     db.referal_code_table.insert_one({
              "profile_id": session["user_id"],
              "product_id": g_cart1,
@@ -334,6 +348,9 @@ def check_referral():
 
     if not referral_code:
         return jsonify({"valid": False, "message": "Referral code cannot be empty"}), 400
+    check=db.completed_orders.find_one({'code':referral_code})
+    if check and check.get("pending")== 0:
+        return jsonify({"valid": False, "message": "Invalid referral code."}), 400
 
     referral = db.referal_code_table.find_one({"code": referral_code})
     if referral and referral.get("is_valid", False):
@@ -416,7 +433,13 @@ def proceed_to_checkout():
 #         return render_template("success.html", payment_id=payment_id,code=code)
 #     except razorpay.errors.SignatureVerificationError:
 #         return "Payment verification failed!", 400
-
+@app.route("/order")
+def order():
+    if "user_id" not in session:
+        flash("Please log in to view your orders.", "warning")
+        return redirect(url_for("login_form"))
+    order1=db.completed_orders.find({"user_id": session["user_id"]})
+    return render_template("order.html",order1=order1)
 
 if __name__ == "__main__":
     app.run(debug=True)
