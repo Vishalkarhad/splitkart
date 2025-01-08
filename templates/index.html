@@ -40,15 +40,89 @@
         top: -50px;
         opacity: 0;
     }
+    /* ----------------------------------------- */
+    .slideshow-container {
+            position: relative;
+            width: calc(100% - 2cm);
+            height: 5cm;
+            overflow: hidden;
+            margin: auto;
+        }
+
+        .slide {
+            display: none;
+            width: 100%;
+            height: 100%;
+            position: absolute;
+            top: 0;
+            left: 0;
+            background-size: cover;
+            background-position: center;
+        }
+
+        /* Example slides background */
+        .slide1 {background-image:url('https://rukminim1.flixcart.com/fk-p-flap/1010/170/image/7617fde0004272d6.jpg?q=20'); }
+        .slide2 { background-image:url('https://rukminim1.flixcart.com/fk-p-flap/1010/170/image/53dcf24ecc20bf27.jpg?q=20')  }
+        .slide3 { background-image: url('https://rukminim1.flixcart.com/fk-p-flap/1010/170/image/806d964bcd5934db.jpg?q=20'); }
+
+        .active {
+            display: block;
+        }
+
+        .arrow {
+            position: absolute;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 30px;
+            height: 30px;
+            background-color: rgba(0, 0, 0, 0.5);
+            color: white;
+            border: none;
+            cursor: pointer;
+            z-index: 10;
+            text-align: center;
+            line-height: 30px;
+            font-size: 18px;
+            border-radius: 50%;
+        }
+
+        .arrow.left {
+            left: 10px;
+        }
+
+        .arrow.right {
+            right: 10px;
+        }
+
+        .dots {
+            position: absolute;
+            bottom: 10px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 10px;
+        }
+
+        .dot {
+            width: 10px;
+            height: 10px;
+            background-color: rgba(0, 0, 0, 0.5);
+            border-radius: 50%;
+            cursor: pointer;
+        }
+
+        .dot.active {
+            background-color: white;
+        }
 </style>
 
 <body>
     <header class="header1">
-        <div class="top-bar">
+        <!-- <div class="top-bar">
             <h1 class="headline">Buy the product with your friends circle</h1>
-        </div>
+        </div> -->
         <nav class="navbar">
-            <div class="logo">SPLITKART STORE</div>
+            <div class="logo" style="color: #6c757d;">SPLITKART STORE</div>
             <ul class="menu">
                 <li><a href="/"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-house-heart-fill" viewBox="0 0 16 16">
                     <path d="M7.293 1.5a1 1 0 0 1 1.414 0L11 3.793V2.5a.5.5 0 0 1 .5-.5h1a.5.5 0 0 1 .5.5v3.293l2.354 2.353a.5.5 0 0 1-.708.707L8 2.207 1.354 8.853a.5.5 0 1 1-.708-.707z"/>
@@ -77,14 +151,21 @@
             </ul>
         </nav>
     </header>
-
-    <!-- Referral Section -->
-    <!-- <section class="referral-section">
-        <input type="text" placeholder="Enter Referral Code if you have">
-        <button onclick="checkReferral()">Check</button>
-        <div id="message"></div>
-        <div id="message2"></div>
-    </section> -->
+    <div class="slideshow-container">
+        <button class="arrow left" onclick="showPreviousSlide()">&#8249;</button>
+        <button class="arrow right" onclick="showNextSlide()">&#8250;</button>
+    
+        <div class="slide slide1 active"></div>
+        <div class="slide slide2"></div>
+        <div class="slide slide3"></div>
+    
+        <div class="dots">
+            <div class="dot active" onclick="goToSlide(0)"></div>
+            <div class="dot" onclick="goToSlide(1)"></div>
+            <div class="dot" onclick="goToSlide(2)"></div>
+        </div>
+    </div>
+    
 
     <!-- Main Section -->
     <main>
@@ -149,7 +230,38 @@
     </script>
     
     <div id="popup-notification" class="hidden">Product added to cart!</div>
-
+    <script>
+        let currentIndex = 0;
+        const slides = document.querySelectorAll('.slide');
+        const dots = document.querySelectorAll('.dot');
+    
+        function updateSlides() {
+            slides.forEach((slide, index) => {
+                slide.classList.toggle('active', index === currentIndex);
+            });
+            dots.forEach((dot, index) => {
+                dot.classList.toggle('active', index === currentIndex);
+            });
+        }
+    
+        function showNextSlide() {
+            currentIndex = (currentIndex + 1) % slides.length;
+            updateSlides();
+        }
+    
+        function showPreviousSlide() {
+            currentIndex = (currentIndex - 1 + slides.length) % slides.length;
+            updateSlides();
+        }
+    
+        function goToSlide(index) {
+            currentIndex = index;
+            updateSlides();
+        }
+    
+        // Change slide every 3 seconds
+        setInterval(showNextSlide, 3000);
+    </script>
 </body>
 
 </html>
