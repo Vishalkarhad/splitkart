@@ -2,8 +2,8 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Clickkart</title>
+    <meta name="viewport" content="width=1024">
+    <title>Splitkart</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
     <link href="{{ url_for('static', filename='img/favicon.ico') }}" rel="icon">
 
@@ -20,7 +20,7 @@
 
     <!-- Customized Bootstrap Stylesheet -->
     <link href="{{ url_for('static', filename='css/style.css') }}" rel="stylesheet">
-    <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+    <!-- <script src="https://checkout.razorpay.com/v1/checkout.js"></script> -->
 
 </head>
 <body>
@@ -29,7 +29,7 @@
             <p>Buy the product with your friends circle</p>
         </div>
         <nav class="navbar">
-            <div class="logo">CLICKKART STORE</div>
+            <div class="logo">SPLITKART STORE</div>
             <ul class="menu">
                 <li><a href="/"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-house-heart-fill" viewBox="0 0 16 16">
                     <path d="M7.293 1.5a1 1 0 0 1 1.414 0L11 3.793V2.5a.5.5 0 0 1 .5-.5h1a.5.5 0 0 1 .5.5v3.293l2.354 2.353a.5.5 0 0 1-.708.707L8 2.207 1.354 8.853a.5.5 0 1 1-.708-.707z"/>
@@ -63,6 +63,7 @@
 
     <!-- Main Section -->
     <main>
+        <form id="payment-form" method="POST" action="/checkout">
         <div class="container-fluid">
             <div class="row px-xl-5">
                 <div class="col-lg-8">
@@ -93,7 +94,7 @@
                             </div>
                             <div class="col-md-6 form-group">
                                 <label>Address Line 2</label>
-                                <input class="form-control" type="text" placeholder="123 Street" id="address2" name="address2" required>
+                                <input class="form-control" type="text" placeholder="123 Street" id="address2" name="address2" >
                             </div>
                             <div class="col-md-6 form-group">
                                 <label>Country</label>
@@ -128,7 +129,7 @@
                             </div> -->
                         </div>
                     </div>
-                </form>
+                
                     
                 </div>
                 <div class="col-lg-4">
@@ -190,73 +191,13 @@
                 </div>
             </div>
         </div>
-       
+        </form>
     </main>
 
     <footer>
-        <p>© 2025 Clickmark Store. All Rights Reserved.</p>
+        <p>© 2025 Splitkart Store. All Rights Reserved.</p>
     </footer>
 </body>
 
-<script>
-    document.getElementById("pay-button").addEventListener("click", function () {
-        const amount = `{{ total | tojson }}`; // Amount in paise
 
-        // Create order on the server
-        fetch("/create_order", {
-            method: "POST",
-            headers: { "Content-Type": "application/x-www-form-urlencoded" },
-            body: `amount=${encodeURIComponent(amount)}`
-        })
-        .then(response => response.json())
-        .then(order => {
-            if (order.error) {
-                alert(order.error);
-                return;
-            }
-
-            // Initialize Razorpay
-            const options = {
-                key: "{{ key_id }}",
-                amount: order.amount,
-                currency: order.currency,
-                order_id: order.id,
-                name: "Clickkart Store",
-                description: "Acme Corp",
-                handler: function (response) {
-                    document.getElementById('fname').value = response.fname;
-                    document.getElementById('lname').value = response.lname;
-                    document.getElementById('email').value = response.email;
-                    document.getElementById('mobile').value = response.mobile;
-                    document.getElementById('address1').value = response.address1;
-                    document.getElementById('address2').value = response.address2;
-                    document.getElementById('city').value = response.city;
-                    document.getElementById('state').value = response.state;
-                    document.getElementById('zip').value = response.zip;
-                    document.getElementById('payment-form').submit();
-                    // Submit the payment details to the server
-                    fetch("/success", {
-                        method: "POST",
-                        headers: { "Content-Type": "application/x-www-form-urlencoded" },
-                        body: new URLSearchParams(response)
-                        
-
-                    })
-                    .then(() => window.location.href = "/success")
-                    .catch(() => alert("Payment verification failed!"));
-                },
-                prefill: {
-                    name: document.getElementById('lname').value,
-                    email: document.getElementById('email').value,
-                    contact: document.getElementById('mobile').value
-                },
-                theme: { color: "#F37254" }
-            };
-
-            const razorpay = new Razorpay(options);
-            razorpay.open();
-        })
-        .catch(error => alert("Error creating order: " + error.message));
-    });
-</script>
 </html>

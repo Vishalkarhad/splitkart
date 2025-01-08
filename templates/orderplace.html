@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=1024">
+    <title>Order Success</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='orderplace.css') }}">
+</head>
+<body>
+    <main>
+        <div class="success-container">
+            <div class="success-message">
+                <h1>🎉 Hurrey! Your Order is Placed Successfully! 🎉</h1>
+                <p>Your Referral code is :</p>
+                <h2 style="color: rgb(14, 224, 171);">{{code}}</h2>
+                <p style="color: brown;">No of sharing people :{{no_of_people}}</p>
+                <p>Your sharing price : {{sharing_price}}</p>
+            </div>
+            <div class="product-details">
+                <!-- Product Card 1 -->
+                 {% for item in cart%}
+                <div class="product-card">
+                    <img src={{item[0]}} alt={{item[1]}} class="product-image">
+                    <h2 class="product-name">{{item[1][0:9]}}</h2>
+                    <p class="product-price">Price: ₹{{item[2]}}0</p>
+                </div>
+                {% endfor %}
+                
+            </div>
+        </div>
+    </main>
+</body>
+</html>

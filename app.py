@@ -235,7 +235,7 @@ def view_cart2():
     global g_total_price, g_sharing_people, g_total
     g_total_price = total_price
     g_total = g_total_price // (g_sharing_people - 1)
-    return render_template("cart1.html", cart=g_cart1, total_price1=g_total_price // 3, total_price=g_total_price, share_with_people=3, referral_code=g_referral_code, s_price=g_sharing_price)
+    return render_template("cart1.html", cart=g_cart1, total_price1=g_total_price // 3, total_price=g_total_price, share_with_people=4, referral_code=g_referral_code, s_price=g_sharing_price)
 
 
 
@@ -261,35 +261,70 @@ def remove_item():
 def checkout():
     if "user_id" not in session:
         return jsonify({"status": "error", "message": "Please log in to complete the payment."}), 401
+    fname=request.form['fname']
+    lname=request.form['lname']
+    email=request.form['email']
+    mobile=request.form['mobile']
+    address1=request.form['address1']
+    address2=request.form['address2']
+    city=request.form['city']
+    state=request.form['state']
+    zip=request.form['zip']
 
     # Mock payment verification logic (replace with actual payment gateway integration)
-    payment_data = request.get_json()
-    payment_status = payment_data.get("status", "failed")
+    # Retrieve the cart items for the user
+    user_id = session["user_id"]
+    user_cart = db.cart.find_one({"user_id": user_id})
 
-    if payment_status == "success":
-        # Retrieve the cart items for the user
-        user_id = session["user_id"]
-        user_cart = db.cart.find_one({"user_id": user_id})
+    if not user_cart or not user_cart.get("items"):
+        return jsonify({"status": "error", "message": "Cart is empty. Add items to checkout."}), 400
 
-        if not user_cart or not user_cart.get("items"):
-            return jsonify({"status": "error", "message": "Cart is empty. Add items to checkout."}), 400
-
-        # Move cart items to the completed_orders collection
-        completed_order = {
+    # Move cart items to the completed_orders collection
+    code=generate_code()  # Generate a unique referral code
+    completed_order = {
             "user_id": user_id,
-            "items": user_cart["items"],
+            "items": g_cart1,
+            "total_price": g_total_price,
+            'code':code,
+            'sharing_price':g_total,
+            'sharing_people':g_sharing_people,
+            "use_code":g_referral_code,
+            "minumum_buying_price":g_sharing_price,
             "payment_status": "success",
-            "payment_details": payment_data,  # Store additional payment details if available
+              # Store additional payment details if available
             "order_date": datetime.utcnow()
         }
-        db.completed_orders.insert_one(completed_order)
+    db.completed_orders.insert_one(completed_order)
+    db.referal_code_table.insert_one({
+             "profile_id": session["user_id"],
+             "product_id": g_cart1,
+             "code": code,
+             "sharing_price": g_total,
+             "no_of_people": g_sharing_people,
+             "original_price": g_total_price,
+             "use_code":g_referral_code,
+             "is_valid": True}) 
 
         # Empty the user's cart
-        db.cart.update_one({"user_id": user_id}, {"$set": {"items": []}})
+    db.cart.update_one({"user_id": user_id}, {"$set": {"items": []}})
+    db.address.insert_one({
+        
+        "user_id":user_id,
+        "code":code,
+        "cart":g_cart1,
+        "fname":fname,
+        "lname":lname,
+        "email":email,
+        "mobile":mobile,
+        "address1":address1,
+        "address2":address2,
+        "city":city,
+        "state":state,
+        "zip":zip
+    })
 
-        return jsonify({"status": "success", "message": "Payment successful. Order placed!"}), 200
-    else:
-        return jsonify({"status": "error", "message": "Payment failed. Please try again."}), 400
+    # return jsonify({"status": "success", "message": "Payment successful. Order placed!","code":code,"no_of_people":g_sharing_people,"sharing_price":g_total,"oder":g_cart1}), 200
+    return render_template("orderplace.html" ,code=code,no_of_people=g_sharing_people,sharing_price=g_total,cart=g_cart1)
 
 
 @app.route("/check-referral", methods=["POST"])
@@ -335,105 +370,52 @@ def proceed_to_checkout():
         flash(f"your total is less than {g_sharing_price}")
         return render_template("cart1.html",  cart=g_cart1 ,total_price1=g_total,total_price=g_total_price ,share_with_people=g_sharing_people-1,referral_code=g_referral_code,s_price=g_sharing_price)
 
-# @app.route("/razorpay" )
-# def create_order():
 
-#     """
-#     Creates an order on Razorpay.
+# @app.route("/success", methods=["POST"])
+# def success():
+#     payment_id = request.form["razorpay_payment_id"]
+#     order_id = request.form["razorpay_order_id"]
+#     signature = request.form["razorpay_signature"]
 
-#     :param amount: Amount in the smallest unit of currency (e.g., for INR, 100 = ₹1).
-#     :param currency: Currency code (default is INR).
-#     :param receipt: Unique receipt ID for the order.
-#     :return: Order details as a dictionary.
-#     """
-#     global g_total
-#     amount = g_total  # Use the global g_total as the amount
-#     currency = "INR"
-#     receipt = "order_rcptid_11"
+#     # Verify the payment signature
 #     try:
-#         # Convert amount to the smallest unit (e.g., ₹500.00 = 50000 paise)
-#         order_amount = int(amount * 100)  # For INR, amount is in paise
-#         order_currency = currency
-#         order_receipt = receipt
-
-#         # Order creation payload
-#         data = {
-#             "amount": order_amount,
-#             "currency": order_currency,
-#             "receipt": order_receipt,
-#             "payment_capture": 1  # Auto-capture payment (1 for true, 0 for manual)
-#         }
-
-#         # Create an order
-#         order = client.order.create(data=data)
-#         print("Order created successfully:", order)
-#         return order
-#     except Exception as e:
-#         print("Error creating order:", str(e))
-#         return None
-
-
-@app.route("/create_order", methods=["POST"])
-def create_order():
-    amount = int(request.form["amount"]) * 100  # Convert to paise (Razorpay expects the amount in paise)
-    currency = "INR"
-
-    # Create Razorpay order
-    try:
-        order = razorpay_client.order.create({
-            "amount": amount,
-            "currency": currency,
-            "payment_capture": 1  # Auto capture payment
-        })
-        return jsonify(order)
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-
-@app.route("/success", methods=["POST"])
-def success():
-    payment_id = request.form["razorpay_payment_id"]
-    order_id = request.form["razorpay_order_id"]
-    signature = request.form["razorpay_signature"]
-
-    # Verify the payment signature
-    try:
-        razorpay_client.utility.verify_payment_signature({
-            "razorpay_order_id": order_id,
-            "razorpay_payment_id": payment_id,
-            "razorpay_signature": signature
-        })
-        db.payment_collection.insert_one({
+#         razorpay_client.utility.verify_payment_signature({
+#             "razorpay_order_id": order_id,
+#             "razorpay_payment_id": payment_id,
+#             "razorpay_signature": signature
+#         })
+#         db.payment_collection.insert_one({
             
-            "payment_id": payment_id,
-            "order_id": order_id,
-            "signature": signature,
-            "status": "success"
-        })
-        code=generate_code()  # Generate a unique referral code
-        db.referal_code_table.insert_one({
-            "profile_id": session["user_id"],
-            "product_id": g_cart1,
-            "code": code,
-            "sharing_price": g_sharing_price,
-            "no_of_people": g_sharing_people,
-            "original_price": g_total_price,
-            "is_valid": True})  # Store the referral code in the database
-        db.billing_table.insert_one({
-            "profile_id": session["user_id"],
-            "product_id": g_cart1,
-            "total_price": g_total_price,
-            "sharing_price": g_sharing_price,
-            "no_of_people": g_sharing_people,
-            "order_id": order_id,
-            "payment_id": payment_id,
-            "signature": signature,
-            "code": code,
-            })  # Store the billing details in the database
+#             "payment_id": payment_id,
+#             "order_id": order_id,
+#             "signature": signature,
+#             "status": "success"
+#         })
+#         code=generate_code()  # Generate a unique referral code
+#         db.referal_code_table.insert_one({
+#             "profile_id": session["user_id"],
+#             "product_id": g_cart1,
+#             "code": code,
+#             "sharing_price": g_sharing_price,
+#             "no_of_people": g_sharing_people,
+#             "original_price": g_total_price,
+#             "is_valid": True})  # Store the referral code in the database
+#         db.billing_table.insert_one({
+#             "profile_id": session["user_id"],
+#             "product_id": g_cart1,
+#             "total_price": g_total_price,
+#             "sharing_price": g_sharing_price,
+#             "no_of_people": g_sharing_people,
+#             "order_id": order_id,
+#             "payment_id": payment_id,
+#             "signature": signature,
+#             "code": code,
+#             })  # Store the billing details in the database
 
-         # Clear the cart after successful payment
-        return render_template("success.html", payment_id=payment_id,code=code)
-    except razorpay.errors.SignatureVerificationError:
-        return "Payment verification failed!", 400
+#          # Clear the cart after successful payment
+#         return render_template("success.html", payment_id=payment_id,code=code)
+#     except razorpay.errors.SignatureVerificationError:
+#         return "Payment verification failed!", 400
 
 
 if __name__ == "__main__":
