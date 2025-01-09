@@ -8,6 +8,7 @@
 
     <title>Splitkart</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+    
 
     
     
@@ -114,6 +115,17 @@
         .dot.active {
             background-color: white;
         }
+        .rating {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin: 10px 0;
+}
+
+.stars {
+  color: gold;
+  font-size: 18px;
+}
 </style>
 
 <body>
@@ -122,7 +134,7 @@
             <h1 class="headline">Buy the product with your friends circle</h1>
         </div> -->
         <nav class="navbar">
-            <div class="logo" style="color: #6c757d;">SPLITKART STORE</div>
+            <div class="logo" style="color: #6c757d;">SPLITKART STORE <img src="https://cdn-icons-png.flaticon.com/128/7734/7734681.png" alt="" width="40px" height="40px"></div>
             <ul class="menu">
                 <li><a href="/"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-house-heart-fill" viewBox="0 0 16 16">
                     <path d="M7.293 1.5a1 1 0 0 1 1.414 0L11 3.793V2.5a.5.5 0 0 1 .5-.5h1a.5.5 0 0 1 .5.5v3.293l2.354 2.353a.5.5 0 0 1-.708.707L8 2.207 1.354 8.853a.5.5 0 1 1-.708-.707z"/>
@@ -181,8 +193,15 @@
                 <div class="product-card">
                     <img src="{{product['product_url']}}" alt="{{product['product_name']}}">
                     <h3>{{product['product_name']}}</h3>
-                    <p>Price: <span class="original-price">₹ {{product['product_price']}}</span> <span class="offer-price">₹{{(product['product_price'] | int)//3}}</span></p>
-                    <button class="add-to-cart"onclick="addToCart('{{product['product_url']}}','{{product['product_name']}}', {{(product['product_price'] | int)}})">Add to Cart</button>
+                    <div class="rating">
+                        <span class="stars">★★★★★</span>
+                        <span class="rating-value"></span>
+            
+                      </div>
+                    <p>Price: <span class="original-price">₹ {{product['product_price']}}</span> <span class="offer-price">₹{{(product['product_price'] | int)//3}} </span></p>
+                   
+                    <button class="add-to-cart"onclick="addToCart('{{product['product_url']}}','{{product['product_name']}}', {{(product['product_price'] | int)}})">Add to Cart </button>
+                    
                 </div>
                 {% endfor %}
                 <!-- Product 2 -->
