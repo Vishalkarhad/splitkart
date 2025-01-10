@@ -268,11 +268,7 @@ def remove_item():
 def checkout():
     if "user_id" not in session:
         return jsonify({"status": "error", "message": "Please log in to complete the payment."}), 401
-    data = request.get_json()
-    payment_id = data.get('payment_id')
-    order_id = data.get('order_id')
-    signature = data.get('signature')
-    # ---------------------------------------------
+    
     fname=request.form['fname']
     lname=request.form['lname']
     email=request.form['email']
@@ -304,23 +300,18 @@ def checkout():
     if not user_cart or not user_cart.get("items"):
         return jsonify({"status": "error", "message": "Cart is empty. Add items to checkout."}), 400
     
-    try:
-        razorpay_client.utility.verify_payment_signature({
-             "razorpay_order_id": order_id,
-             "razorpay_payment_id": payment_id,
-             "razorpay_signature": signature
-         })
-        db.completed_orders.insert_one(completed_order)
-        filter = {"code":g_referral_code}
-        document = db.completed_orders.find_one(filter)
-        if document:
-            # Get the current value of sharing_people
-            current_pending = document.get("pending", 0)
-            updated_pending = current_pending - 1
-            update = {"$set": {"pending": updated_pending}}
-            result = db.completed_orders.update_one(filter, update)
+    
+    db.completed_orders.insert_one(completed_order)
+    filter = {"code":g_referral_code}
+    document = db.completed_orders.find_one(filter)
+    if document:
+        # Get the current value of sharing_people
+        current_pending = document.get("pending", 0)
+        updated_pending = current_pending - 1
+        update = {"$set": {"pending": updated_pending}}
+        result = db.completed_orders.update_one(filter, update)
 
-        db.referal_code_table.insert_one({
+    db.referal_code_table.insert_one({
              "profile_id": session["user_id"],
              "product_id": g_cart1,
              "code": code,
@@ -330,8 +321,8 @@ def checkout():
              "use_code":g_referral_code,
              "is_valid": True})  # Store the referral code in the database
     
-        db.cart.update_one({"user_id": user_id}, {"$set": {"items": []}})
-        db.address.insert_one({
+    db.cart.update_one({"user_id": user_id}, {"$set": {"items": []}})
+    db.address.insert_one({
             "user_id":user_id,
             "code":code,
             "cart":g_cart1,
@@ -345,21 +336,41 @@ def checkout():
             "state":state,
             "zip":zip
             })
+    
+    return render_template("orderplace.html" ,code=code,no_of_people=g_sharing_people,sharing_price=g_total,cart=g_cart1)
+   
+    
+    
+    
+    
+@app.route('/payment/callback', methods=['POST'])
+def payment_callback():
+    data = request.get_json()
+    payment_id = data.get('payment_id')
+    order_id = data.get('order_id')
+    signature = data.get('signature')
+
+    # Perform verification logic (e.g., verify Razorpay signature)
+    try:
+        razorpay_client.utility.verify_payment_signature({
+             "razorpay_order_id": order_id,
+             "razorpay_payment_id": payment_id,
+             "razorpay_signature": signature
+         })
         db.payment_collection.insert_one({
-            "user":user_id,
+            "user":session["user_id"],
              "payment_id": payment_id,
              "order_id": order_id,
              "signature": signature,
              "status": "success"
          })
-        return render_template("orderplace.html" ,code=code,no_of_people=g_sharing_people,sharing_price=g_total,cart=g_cart1)
-   
-    
-    except razorpay.errors.SignatureVerificationError:
-         return jsonify({"status": "failed", "message": str(e)}), 400
-    
-    
-    
+        # Add Razorpay signature verification code here
+        # Example: razorpay_client.utility.verify_payment_signature(data)
+
+        # Simulate verification success
+        return jsonify({"status": "success", "message": "Payment verified successfully!"}), 200
+    except Exception as e:
+        return jsonify({"status": "failed", "message": str(e)}), 400    
     
     
 

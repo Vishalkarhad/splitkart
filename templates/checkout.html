@@ -214,7 +214,7 @@
                     window.location.href = "/checkout";
     
                     // Send payment details to the server for verification
-                    fetch('/checkout', {
+                    fetch('/payment/callback', {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json',
@@ -233,7 +233,7 @@
                         } else {
                             alert("Payment verification failed! Please try again.");
                         }
-                    })
+                        })
                     .catch((error) => {
                         console.error("Error verifying payment:", error);
                         alert("An error occurred during payment verification.");
