@@ -208,6 +208,7 @@
                 "name": "Splitkart Shop",
                 "description": "Thank you for your purchase!",
                 "image": "{{ url_for('static', filename='img/logo.png') }}", // Optional logo
+                "order_id": "{{ order_id }}",
                 "handler": function (response) {
                     // Display an alert for payment success
                     // alert("Payment Successful! Payment ID: " + response.razorpay_payment_id);

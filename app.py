@@ -9,6 +9,7 @@ import random
 import string
 from dotenv import load_dotenv
 import os
+import logging
 
 load_dotenv()
 class admin:
@@ -340,30 +341,27 @@ def checkout():
     return render_template("orderplace.html" ,code=code,no_of_people=g_sharing_people,sharing_price=g_total,cart=g_cart1)
    
     
-    
-    
-    
-@app.route('/payment/callback', methods=['POST'])
+@app.route('/payment/callback', methods=['POST'])   
 def payment_callback():
-    """Verify the Razorpay payment."""
+    """Verify Razorpay payment."""
     try:
         data = request.json
         payment_id = data['payment_id']
         order_id = data['order_id']
         signature = data['signature']
 
-        # Verify the payment signature
+        # Verify payment signature
         params_dict = {
             'razorpay_order_id': order_id,
             'razorpay_payment_id': payment_id,
             'razorpay_signature': signature
         }
         razorpay_client.utility.verify_payment_signature(params_dict)
-        
-        # If verification succeeds
+
+        # Verification successful
         return jsonify({"status": "success"})
     except razorpay.errors.SignatureVerificationError as e:
-        # If verification fails
+        # Verification failed
         return jsonify({"status": "failure", "error": str(e)})
     except Exception as e:
         # Handle other exceptions
@@ -425,7 +423,21 @@ def check_referral():
 def proceed_to_checkout():
     global g_sharing_price,g_cart1,g_sharing_people,g_total_price,g_total
     if g_total>=g_sharing_price and g_total>=500:
-        return render_template("checkout.html", cart=g_cart1, total=g_total, sharing_people=g_sharing_people,total_price=g_total_price,key_id=RAZORPAY_KEY_ID)
+        try:
+            # Create Razorpay order
+            # Amount in paise (100 paise = 1 INR)
+            order_currency = 'INR'
+            order_receipt = 'order_rcptid_11'
+            payment_order = razorpay_client.order.create({
+                'amount':1*100,
+                'currency': order_currency,
+                'receipt': order_receipt,
+                'payment_capture': 1
+            })
+            return render_template("checkout.html", cart=g_cart1, total=g_total, sharing_people=g_sharing_people,total_price=g_total_price,key_id=RAZORPAY_KEY_ID,order_id=payment_order['id'])
+        except Exception as e:
+            logging.error(f"Error in checkout: {e}")
+            return "Error in creating order", 500
     elif g_total<g_sharing_price:
         flash(f"your total is less than {g_sharing_price}")
         return render_template("cart1.html",  cart=g_cart1 ,total_price1=g_total,total_price=g_total_price ,share_with_people=g_sharing_people-1,referral_code=g_referral_code,s_price=g_sharing_price)
