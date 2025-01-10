@@ -21,6 +21,7 @@
     <!-- Customized Bootstrap Stylesheet -->
     <link href="{{ url_for('static', filename='css/style.css') }}" rel="stylesheet">
     <!-- <script src="https://checkout.razorpay.com/v1/checkout.js"></script> -->
+    <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
 
 </head>
 <body>
@@ -197,6 +198,35 @@
     <footer>
         <p>© 2025 Splitkart Store. All Rights Reserved.</p>
     </footer>
+    <script>
+        document.getElementById('pay-button').onclick = function(e) {
+            e.preventDefault();
+            var options = {
+                "key": `{{key_id}}`, // Enter the Key ID generated from the Dashboard
+                "amount": `{{1 * 100}}`, // Amount is in currency subunits. Default currency is INR. Hence, 50000 refers to 50000 paise
+                "currency": "INR",
+                "name": "Splitkart Shop",
+                "description": "Thank you for your purchase!",
+                "image": "{{ url_for('static', filename='img/logo.png') }}", // Optional logo
+                "handler": function (response) {
+                    alert("Payment Successful! Payment ID: " + response.razorpay_payment_id);
+                    // Submit the form or send payment ID to the server for verification
+                    document.getElementById('payment-form').submit();
+                },
+                "prefill": {
+                    "name": document.getElementById('fname').value + " " + document.getElementById('lname').value,
+                    "email": document.getElementById('email').value,
+                    "contact": document.getElementById('mobile').value
+                },
+                "theme": {
+                    "color": "#3399cc"
+                }
+            };
+            var rzp1 = new Razorpay(options);
+            rzp1.open();
+        };
+    </script>
+    
 </body>
 
 

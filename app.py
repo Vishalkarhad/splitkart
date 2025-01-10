@@ -77,7 +77,14 @@ def get_next_sequence(name):
 
 
 @app.route("/")
-def home():
+@app.route("/<code>")
+def home(code=None):
+    referral_code=code
+    referral = db.referal_code_table.find_one({"code": referral_code})
+    if referral and referral.get("is_valid", False):
+        global g_referral_code, g_sharing_price
+        g_referral_code = referral_code
+        g_sharing_price = referral['sharing_price']
     products=db.product_list.find()
     return render_template("index.html",products=products)
 
@@ -261,6 +268,10 @@ def remove_item():
 def checkout():
     if "user_id" not in session:
         return jsonify({"status": "error", "message": "Please log in to complete the payment."}), 401
+    payment_id = request.form["razorpay_payment_id"]
+    order_id = request.form["razorpay_order_id"]
+    signature = request.form["razorpay_signature"]
+    # ---------------------------------------------
     fname=request.form['fname']
     lname=request.form['lname']
     email=request.form['email']
@@ -270,18 +281,10 @@ def checkout():
     city=request.form['city']
     state=request.form['state']
     zip=request.form['zip']
-
-    # Mock payment verification logic (replace with actual payment gateway integration)
-    # Retrieve the cart items for the user
+    # Verify the payment signature
     user_id = session["user_id"]
     user_cart = db.cart.find_one({"user_id": user_id})
-
-    if not user_cart or not user_cart.get("items"):
-        return jsonify({"status": "error", "message": "Cart is empty. Add items to checkout."}), 400
-
-    # Move cart items to the completed_orders collection
-    code=generate_code()  # Generate a unique referral code
-    
+    code=generate_code()
     completed_order = {
             "user_id": user_id,
             "items": g_cart1,
@@ -296,20 +299,27 @@ def checkout():
               # Store additional payment details if available
             "order_date": datetime.utcnow()
         }
+
+    if not user_cart or not user_cart.get("items"):
+        return jsonify({"status": "error", "message": "Cart is empty. Add items to checkout."}), 400
     
-    db.completed_orders.insert_one(completed_order)
+    try:
+        razorpay_client.utility.verify_payment_signature({
+             "razorpay_order_id": order_id,
+             "razorpay_payment_id": payment_id,
+             "razorpay_signature": signature
+         })
+        db.completed_orders.insert_one(completed_order)
+        filter = {"code":g_referral_code}
+        document = db.completed_orders.find_one(filter)
+        if document:
+            # Get the current value of sharing_people
+            current_pending = document.get("pending", 0)
+            updated_pending = current_pending - 1
+            update = {"$set": {"pending": updated_pending}}
+            result = db.completed_orders.update_one(filter, update)
 
-    filter = {"code":g_referral_code}
-    document = db.completed_orders.find_one(filter)
-    if document:
-        # Get the current value of sharing_people
-        current_pending = document.get("pending", 0)
-        updated_pending = current_pending - 1
-        update = {"$set": {"pending": updated_pending}}
-        result = db.completed_orders.update_one(filter, update)
-
-
-    db.referal_code_table.insert_one({
+        db.referal_code_table.insert_one({
              "profile_id": session["user_id"],
              "product_id": g_cart1,
              "code": code,
@@ -317,28 +327,53 @@ def checkout():
              "no_of_people": g_sharing_people,
              "original_price": g_total_price,
              "use_code":g_referral_code,
-             "is_valid": True}) 
+             "is_valid": True})  # Store the referral code in the database
+    
+        db.cart.update_one({"user_id": user_id}, {"$set": {"items": []}})
+        db.address.insert_one({
+            "user_id":user_id,
+            "code":code,
+            "cart":g_cart1,
+            "fname":fname,
+            "lname":lname,
+            "email":email,
+            "mobile":mobile,
+            "address1":address1,
+            "address2":address2,
+            "city":city,
+            "state":state,
+            "zip":zip
+            })
+        db.payment_collection.insert_one({
+            "user":user_id,
+             "payment_id": payment_id,
+             "order_id": order_id,
+             "signature": signature,
+             "status": "success"
+         })
+        return render_template("orderplace.html" ,code=code,no_of_people=g_sharing_people,sharing_price=g_total,cart=g_cart1)
+   
+    
+    except razorpay.errors.SignatureVerificationError:
+         return "Payment verification failed!", 400
+    
+    
+    
+    
+    
+
+    
+    
+    
+
+
+     
 
         # Empty the user's cart
-    db.cart.update_one({"user_id": user_id}, {"$set": {"items": []}})
-    db.address.insert_one({
-        
-        "user_id":user_id,
-        "code":code,
-        "cart":g_cart1,
-        "fname":fname,
-        "lname":lname,
-        "email":email,
-        "mobile":mobile,
-        "address1":address1,
-        "address2":address2,
-        "city":city,
-        "state":state,
-        "zip":zip
-    })
+    
 
     # return jsonify({"status": "success", "message": "Payment successful. Order placed!","code":code,"no_of_people":g_sharing_people,"sharing_price":g_total,"oder":g_cart1}), 200
-    return render_template("orderplace.html" ,code=code,no_of_people=g_sharing_people,sharing_price=g_total,cart=g_cart1)
+    
 
 
 @app.route("/check-referral", methods=["POST"])
@@ -367,16 +402,16 @@ def check_referral():
         return jsonify({"valid": False, "message": "Invalid referral code."}), 400
 
 
-@app.route("/pay-now", methods=["POST"])
-def pay_now():
-    if "user_id" not in session:
-        flash("Please log in to proceed with payment.", "warning")
-        return redirect(url_for("login_form"))
+# @app.route("/pay-now", methods=["POST"])
+# def pay_now():
+#     if "user_id" not in session:
+#         flash("Please log in to proceed with payment.", "warning")
+#         return redirect(url_for("login_form"))
 
-    # Clear the cart after payment
-    db.cart.delete_many({"user_id": session["user_id"]})
-    flash("Payment successful! Your cart has been cleared.", "success")
-    return redirect(url_for("home"))
+#     # Clear the cart after payment
+#     db.cart.delete_many({"user_id": session["user_id"]})
+#     flash("Payment successful! Your cart has been cleared.", "success")
+#     return redirect(url_for("home"))
 
 @app.route("/proceed_to_checkout")
 def proceed_to_checkout():
@@ -439,7 +474,14 @@ def order():
         flash("Please log in to view your orders.", "warning")
         return redirect(url_for("login_form"))
     order1=db.completed_orders.find({"user_id": session["user_id"]})
-    return render_template("order.html",order1=order1)
+    profile=db.users.find_one({"user_id": session["user_id"]})
+    return render_template("order.html",order1=order1,profile=profile)
+
+@app.route("/order_details/<code>")
+def order_details(code):
+    order1=db.completed_orders.find_one({"code": code,"user_id": session["user_id"]})
+    return render_template("order_details.html",order1=order1)
+
 
 if __name__ == "__main__":
     app.run(debug=True)

@@ -10,23 +10,30 @@
     <main>
         <div class="success-container">
             <div class="success-message">
-                <h1>🎉 Hurrey! Your Order is Placed Successfully! 🎉</h1>
+                <h1>🎉 Your Order Details 🎉</h1>
                 <p>Your Referral code is :</p>
-                <h2 style="color: rgb(14, 224, 171);">{{code}}</h2>
-                <p style="color: brown;">No of sharing people :{{no_of_people}}</p>
-                <p>Your sharing price :₹ {{sharing_price}}</p>
+                <h2 style="color: rgb(14, 224, 171);">{{order1['code']}}</h2>
+                <p style="color: brown;">Use Referral code :{{order1['use_code']}}</p>
+                <p style="color: brown;">No of sharing people :{{order1['sharing_people']}}</p>
+                <p style="color: brown;">pending people :{{order1['pending']}}</p>
+                <p>Your sharing price :₹ {{order1['sharing_price']}}</p>
             </div>
             <div class="product-details">
                 <!-- Product Card 1 -->
-                 {% for item in cart%}
+                 {% for item in order1['items']%}
                 <div class="product-card">
                     <img src={{item[0]}} alt={{item[1]}} class="product-image">
                     <h2 class="product-name">{{item[1][0:9]}}</h2>
                     <p class="product-price">Price: ₹{{item[2]}}</p>
                 </div>
                 {% endfor %}
+
                 
             </div>
+            {% if order1['pending']==0 %}
+            <p style="color: crimson;"> your order is complete</p>
+            <h1 style="color: darkgreen;" >your order is Delivery by next 4-5 days</h1>
+            {% endif %}
         </div>
     </main>
 </body>
