@@ -60,7 +60,7 @@ g_total_price = 0
 g_cart1=[]
 g_total=0
 g_sharing_people=4
-g_code=None
+g_code=generate_code()
 
 # Counters collection for user IDs
 if not db.counters.find_one({"_id": "user_id"}):
@@ -268,7 +268,7 @@ def remove_item():
 
 @app.route("/checkout", methods=["POST"])
 def checkout():
-    code = generate_code()
+    
     
     
     
@@ -343,7 +343,7 @@ def payment_callback():
         razorpay_client.utility.verify_payment_signature(params_dict)
 
          # Store user and payment details in MongoDB
-        g_code=generate_code()
+        
         payment_data = {
             "user_id": session["user_id"],
             "code":g_code,
