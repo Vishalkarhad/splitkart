@@ -266,13 +266,8 @@ def remove_item():
     return jsonify({"status": "success", "message": "Item removed successfully."}), 200
 
 
-@app.route("/checkout", methods=["POST"])
+@app.route("/checkout")
 def checkout():
-    
-    
-    
-    
-   
     completed_order = {
             "user_id": session["user_id"],
             "items": g_cart1,
