@@ -262,14 +262,14 @@
                             city: city,
                             state: state,
                             zip: zip,
-                            
+
                         }),
                     })
                     .then((res) => res.json())
                     .then((data) => {
                         if (data.status === "success") {
                             alert("Payment successful! Redirecting...");
-                            window.location.href = "/success"; // Redirect to success page
+                            window.location.href = "/checkout"; // Redirect to success page
                         } else {
                             alert("Payment verification failed: " + data.error);
                         }
