@@ -268,9 +268,10 @@ def remove_item():
 def checkout():
     if "user_id" not in session:
         return jsonify({"status": "error", "message": "Please log in to complete the payment."}), 401
-    payment_id = request.form["razorpay_payment_id"]
-    order_id = request.form["razorpay_order_id"]
-    signature = request.form["razorpay_signature"]
+    data = request.get_json()
+    payment_id = data.get('payment_id')
+    order_id = data.get('order_id')
+    signature = data.get('signature')
     # ---------------------------------------------
     fname=request.form['fname']
     lname=request.form['lname']
@@ -355,7 +356,7 @@ def checkout():
    
     
     except razorpay.errors.SignatureVerificationError:
-         return "Payment verification failed!", 400
+         return jsonify({"status": "failed", "message": str(e)}), 400
     
     
     

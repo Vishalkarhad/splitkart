@@ -87,7 +87,7 @@
                             </div>
                             <div class="col-md-6 form-group">
                                 <label>Mobile No</label>
-                                <input class="form-control" type="text" placeholder="+123 456 789" id="mobile" name="mobile" required>
+                                <input class="form-control" type="text" placeholder="+91 1234567890" id="mobile" name="mobile" required>
                             </div>
                             <div class="col-md-6 form-group">
                                 <label>Address Line 1</label>
@@ -209,9 +209,35 @@
                 "description": "Thank you for your purchase!",
                 "image": "{{ url_for('static', filename='img/logo.png') }}", // Optional logo
                 "handler": function (response) {
-                    alert("Payment Successful! Payment ID: " + response.razorpay_payment_id);
-                    // Submit the form or send payment ID to the server for verification
-                    document.getElementById('payment-form').submit();
+                    // Display an alert for payment success
+                    // alert("Payment Successful! Payment ID: " + response.razorpay_payment_id);
+                    window.location.href = "/checkout";
+    
+                    // Send payment details to the server for verification
+                    fetch('/checkout', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            payment_id: response.razorpay_payment_id,
+                            order_id: response.razorpay_order_id,
+                            signature: response.razorpay_signature,
+                        }),
+                    })
+                    .then((res) => res.json())
+                    .then((data) => {
+                        if (data.status === "success") {
+                            // Redirect to the server class after successful payment
+                            window.location.href = "/server-class";
+                        } else {
+                            alert("Payment verification failed! Please try again.");
+                        }
+                    })
+                    .catch((error) => {
+                        console.error("Error verifying payment:", error);
+                        alert("An error occurred during payment verification.");
+                    });
                 },
                 "prefill": {
                     "name": document.getElementById('fname').value + " " + document.getElementById('lname').value,
@@ -226,6 +252,7 @@
             rzp1.open();
         };
     </script>
+    
     
 </body>
 
