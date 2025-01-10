@@ -64,7 +64,7 @@
 
     <!-- Main Section -->
     <main>
-        <form id="payment-form" method="POST" action="/checkout">
+        <form id="payment-form">
         <div class="container-fluid">
             <div class="row px-xl-5">
                 <div class="col-lg-8">
@@ -200,21 +200,50 @@
     </footer>
     <script>
         document.getElementById('pay-button').onclick = function(e) {
-            e.preventDefault();
+            e.preventDefault(); // Prevent form submission
+
+            // Validate required fields
+            const firstName = document.getElementById('fname').value.trim();
+            const lastName = document.getElementById('lname').value.trim();
+            const address1 = document.getElementById('address1').value.trim();
+            const address2 = document.getElementById('address2').value.trim();
+            const email = document.getElementById('email').value.trim();
+            const state = document.getElementById('state').value.trim();
+            const city = document.getElementById('city').value.trim();
+            const zip = document.getElementById('zip').value.trim();
+            
+            const mobile = document.getElementById('mobile').value.trim();
+
+            if (!firstName || !lastName || !address1 || !mobile) {
+                alert("Please fill in all required fields.");
+                return; // Stop processing if validation fails
+            }
+
+            // Validate email format
+            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+            if (!emailRegex.test(email)) {
+                alert("Please enter a valid email address.");
+                return;
+            }
+
+            // Validate mobile number (10 digits, numeric)
+            const mobileRegex = /^[0-9]{10}$/;
+            if (!mobileRegex.test(mobile)) {
+                alert("Please enter a valid 10-digit mobile number.");
+                return;
+            }
+
+            // Proceed with Razorpay payment
             var options = {
-                "key": `{{key_id}}`, // Enter the Key ID generated from the Dashboard
-                "amount": `{{1 * 100}}`, // Amount is in currency subunits. Default currency is INR. Hence, 50000 refers to 50000 paise
+                "key": "{{ key_id }}", // Razorpay API Key ID
+                "amount": "{{ 1 * 100 }}", // Amount in paise
                 "currency": "INR",
                 "name": "Splitkart Shop",
-                "description": "Thank you for your purchase!",
-                "image": "{{ url_for('static', filename='img/logo.png') }}", // Optional logo
-                "order_id": "{{ order_id }}",
-                "handler": function (response) {
-                    // Display an alert for payment success
-                    // alert("Payment Successful! Payment ID: " + response.razorpay_payment_id);
-                    // window.location.href = "/checkout";
-    
-                    // Send payment details to the server for verification
+                "description": "Test Transaction",
+                "image": "/static/logo.png", // Add your logo in the static folder
+                "order_id": "{{ order_id }}", // Razorpay Order ID
+                "handler": function(response) {
+                    // Send payment details to server for verification
                     fetch('/payment/callback', {
                         method: 'POST',
                         headers: {
@@ -224,31 +253,42 @@
                             payment_id: response.razorpay_payment_id,
                             order_id: response.razorpay_order_id,
                             signature: response.razorpay_signature,
+                            first_name: firstName,
+                            last_name: lastName,
+                            email: email,
+                            mobile: mobile,
+                            address1: address1,
+                            address2: address2,
+                            city: city,
+                            state: state,
+                            zip: zip,
+                            
                         }),
                     })
                     .then((res) => res.json())
                     .then((data) => {
                         if (data.status === "success") {
-                            // Redirect to the server class after successful payment
-                            window.location.href = "/checkout";
+                            alert("Payment successful! Redirecting...");
+                            window.location.href = "/success"; // Redirect to success page
                         } else {
-                            alert("Payment verification failed! Please try again.");
+                            alert("Payment verification failed: " + data.error);
                         }
-                        })
+                    })
                     .catch((error) => {
                         console.error("Error verifying payment:", error);
                         alert("An error occurred during payment verification.");
                     });
                 },
                 "prefill": {
-                    "name": document.getElementById('fname').value + " " + document.getElementById('lname').value,
-                    "email": document.getElementById('email').value,
-                    "contact": document.getElementById('mobile').value
+                    "name": firstName + " " + lastName,
+                    "email": email,
+                    "contact": mobile
                 },
                 "theme": {
                     "color": "#3399cc"
                 }
             };
+
             var rzp1 = new Razorpay(options);
             rzp1.open();
         };

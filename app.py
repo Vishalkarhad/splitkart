@@ -60,6 +60,7 @@ g_total_price = 0
 g_cart1=[]
 g_total=0
 g_sharing_people=4
+g_code=None
 
 # Counters collection for user IDs
 if not db.counters.find_one({"_id": "user_id"}):
@@ -267,27 +268,16 @@ def remove_item():
 
 @app.route("/checkout", methods=["POST"])
 def checkout():
-    if "user_id" not in session:
-        return jsonify({"status": "error", "message": "Please log in to complete the payment."}), 401
+    code = generate_code()
     
-    fname=request.form['fname']
-    lname=request.form['lname']
-    email=request.form['email']
-    mobile=request.form['mobile']
-    address1=request.form['address1']
-    address2=request.form['address2']
-    city=request.form['city']
-    state=request.form['state']
-    zip=request.form['zip']
-    # Verify the payment signature
-    user_id = session["user_id"]
-    user_cart = db.cart.find_one({"user_id": user_id})
-    code=generate_code()
+    
+    
+   
     completed_order = {
-            "user_id": user_id,
+            "user_id": session["user_id"],
             "items": g_cart1,
             "total_price": g_total_price,
-            'code':code,
+            'code':g_code,
             'sharing_price':g_total,
             'sharing_people':g_sharing_people,
             "use_code":g_referral_code,
@@ -298,8 +288,7 @@ def checkout():
             "order_date": datetime.utcnow()
         }
 
-    if not user_cart or not user_cart.get("items"):
-        return jsonify({"status": "error", "message": "Cart is empty. Add items to checkout."}), 400
+    
     
     
     db.completed_orders.insert_one(completed_order)
@@ -315,30 +304,16 @@ def checkout():
     db.referal_code_table.insert_one({
              "profile_id": session["user_id"],
              "product_id": g_cart1,
-             "code": code,
+             "code": g_code,
              "sharing_price": g_total,
              "no_of_people": g_sharing_people,
              "original_price": g_total_price,
              "use_code":g_referral_code,
              "is_valid": True})  # Store the referral code in the database
     
-    db.cart.update_one({"user_id": user_id}, {"$set": {"items": []}})
-    db.address.insert_one({
-            "user_id":user_id,
-            "code":code,
-            "cart":g_cart1,
-            "fname":fname,
-            "lname":lname,
-            "email":email,
-            "mobile":mobile,
-            "address1":address1,
-            "address2":address2,
-            "city":city,
-            "state":state,
-            "zip":zip
-            })
+    db.cart.update_one({"user_id":session["user_id"]}, {"$set": {"items": []}})
     
-    return render_template("orderplace.html" ,code=code,no_of_people=g_sharing_people,sharing_price=g_total,cart=g_cart1)
+    return render_template("orderplace.html" ,code=g_code,no_of_people=g_sharing_people,sharing_price=g_total,cart=g_cart1)
    
     
 @app.route('/payment/callback', methods=['POST'])   
@@ -349,6 +324,15 @@ def payment_callback():
         payment_id = data['payment_id']
         order_id = data['order_id']
         signature = data['signature']
+        fname=data['first_name']
+        lname=data['last_name']
+        email=data['email']
+        mobile=data['mobile']
+        address1=data['address1']
+        address2=data['address2']
+        city=data['city']
+        state=data['state']
+        zip=data['zip']
 
         # Verify payment signature
         params_dict = {
@@ -357,6 +341,27 @@ def payment_callback():
             'razorpay_signature': signature
         }
         razorpay_client.utility.verify_payment_signature(params_dict)
+
+         # Store user and payment details in MongoDB
+        g_code=generate_code()
+        payment_data = {
+            "user_id": session["user_id"],
+            "code":g_code,
+            "cart": g_cart1,
+            "payment_id": payment_id,
+            "order_id": order_id,
+            "first_name": fname,
+            "last_name": lname,
+            "email": email,
+            "mobile": mobile,
+            "address1": address1,
+            "address2": address2,
+            "city": city,
+            "state": state,
+            "zip": zip,
+            "status": "success"
+        }
+        db.address.insert_one(payment_data)
 
         # Verification successful
         return jsonify({"status": "success"})
