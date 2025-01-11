@@ -60,7 +60,7 @@ g_total_price = 0
 g_cart1=[]
 g_total=0
 g_sharing_people=4
-g_code=generate_code()
+g_code=None
 
 # Counters collection for user IDs
 if not db.counters.find_one({"_id": "user_id"}):
@@ -87,7 +87,8 @@ def home(code=None):
         global g_referral_code, g_sharing_price
         g_referral_code = referral_code
         g_sharing_price = referral['sharing_price']
-    products=db.product_list.find()
+    total_docs = db.product_list.count_documents({})
+    products=db.product_list.aggregate([{"$sample": {"size": total_docs}}])
     return render_template("index.html",products=products)
 
 @app.route('/adminlogin')
@@ -296,15 +297,7 @@ def checkout():
         update = {"$set": {"pending": updated_pending}}
         result = db.completed_orders.update_one(filter, update)
 
-    db.referal_code_table.insert_one({
-             "profile_id": session["user_id"],
-             "product_id": g_cart1,
-             "code": g_code,
-             "sharing_price": g_total,
-             "no_of_people": g_sharing_people,
-             "original_price": g_total_price,
-             "use_code":g_referral_code,
-             "is_valid": True})  # Store the referral code in the database
+    
     
     db.cart.update_one({"user_id":session["user_id"]}, {"$set": {"items": []}})
     
@@ -316,6 +309,7 @@ def payment_callback():
     """Verify Razorpay payment."""
     try:
         data = request.json
+       
         payment_id = data['payment_id']
         order_id = data['order_id']
         signature = data['signature']
@@ -342,6 +336,7 @@ def payment_callback():
         payment_data = {
             "user_id": session["user_id"],
             "code":g_code,
+            
             "cart": g_cart1,
             "payment_id": payment_id,
             "order_id": order_id,
@@ -357,6 +352,15 @@ def payment_callback():
             "status": "success"
         }
         db.address.insert_one(payment_data)
+        db.referal_code_table.insert_one({
+             "profile_id": session["user_id"],
+             "product_id": g_cart1,
+             "code": g_code,
+             "sharing_price": g_total,
+             "no_of_people": g_sharing_people,
+             "original_price": g_total_price,
+             "use_code":g_referral_code,
+             "is_valid": True})  # Store the referral code in the database
 
         # Verification successful
         return jsonify({"status": "success"})
@@ -424,6 +428,8 @@ def proceed_to_checkout():
     global g_sharing_price,g_cart1,g_sharing_people,g_total_price,g_total
     if g_total>=g_sharing_price and g_total>=500:
         try:
+            global g_code
+            g_code=generate_code()
             # Create Razorpay order
             # Amount in paise (100 paise = 1 INR)
             order_currency = 'INR'
