@@ -286,10 +286,15 @@
                 },
                 "theme": {
                     "color": "#3399cc"
-                }
+                },
+                modal: {
+                ondismiss: function () {
+                alert("Payment modal closed");
+              },
+            },
             };
 
-            var rzp1 = new Razorpay(options);
+            const rzp1 = new Razorpay(options);
             rzp1.open();
         };
     </script>

@@ -148,7 +148,7 @@ header {
 
 .product-card img {
     max-width: 100%;
-    height: auto;
+    height: 200px;
     border-bottom: 1px solid #ddd;
     margin-bottom: 10px;
 }

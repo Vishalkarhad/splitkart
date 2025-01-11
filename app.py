@@ -131,7 +131,7 @@ def signup():
     password = request.form["password"]
 
     if db.users.find_one({"mobile_no": mobile_no}):
-        return jsonify({"status": "error", "message": "Mobile number already registered."})
+        return render_template("signup.html", message="Mobile number already exists.")
 
     user_id = get_next_sequence("user_id")
    
@@ -146,9 +146,11 @@ def signup():
     return render_template("login.html")
 
 
-@app.route("/login")
+@app.route("/login", methods=["GET"])
 def login_form():
-    return render_template("login.html")
+    next_url = request.args.get("next")  # Get the 'next' parameter if present
+    return render_template("login.html", next=next_url)
+
 
 
 @app.route("/login1", methods=["POST"])
@@ -201,7 +203,7 @@ def add_to_cart():
 def view_cart():
     if "user_id" not in session:
         flash("Please log in to view your cart.", "warning")
-        return redirect(url_for("login_form"))
+        return redirect(url_for("login_form", next = request.url))
 
     cart_list = db.cart.find({"user_id": session["user_id"]})
     global g_cart1
@@ -232,7 +234,7 @@ def cart_summary():
 def view_cart2():
     if "user_id" not in session:
         flash("Please log in to view your cart.", "warning")
-        return redirect(url_for("login_form"))
+        return redirect(url_for("login_form",next=request.url))
 
     cart_list = db.cart.find({"user_id": session["user_id"]})
     global g_cart1
