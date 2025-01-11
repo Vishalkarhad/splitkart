@@ -236,7 +236,7 @@
             // Proceed with Razorpay payment
             var options = {
                 "key": "{{ key_id }}", // Razorpay API Key ID
-                "amount": "{{ 1 * 100 }}", // Amount in paise
+                "amount": "{{ total * 100 }}", // Amount in paise
                 "currency": "INR",
                 "name": "Splitkart Shop",
                 "description": "Test Transaction",
