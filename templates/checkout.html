@@ -243,6 +243,7 @@
                 "image": "/static/logo.png", // Add your logo in the static folder
                 "order_id": "{{ order_id }}", // Razorpay Order ID
                 "handler": function(response) {
+                    
                     // Send payment details to server for verification
                     fetch('/payment/callback', {
                         method: 'POST',
@@ -287,16 +288,14 @@
                 "theme": {
                     "color": "#3399cc"
                 },
-                modal: {
-                ondismiss: function () {
-                alert("Payment modal closed");
-              },
-            },
+                
             };
 
-            const rzp1 = new Razorpay(options);
+            var rzp1 = new Razorpay(options);
             rzp1.open();
         };
+        
+        
     </script>
     
     

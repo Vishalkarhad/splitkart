@@ -390,6 +390,8 @@ def payment_callback():
 
 @app.route("/check-referral", methods=["POST"])
 def check_referral():
+    global g_referral_code, g_sharing_price
+    g_referral_code = None
     data = request.json
     referral_code = data.get("referral_code")
 
@@ -401,14 +403,14 @@ def check_referral():
 
     referral = db.referal_code_table.find_one({"code": referral_code})
     if referral and referral.get("is_valid", False):
-        global g_referral_code, g_sharing_price
+        
         g_referral_code = referral_code
         g_sharing_price = referral['sharing_price']
         
         return jsonify({
             "valid": True,
-            "message": f"Referral code {g_referral_code} is valid!",
-            "message2": f" your minimun buying price is :{g_sharing_price}",
+            "message": f"Referral code {referral_code} is valid!",
+            "message2": f" your minimun buying price is :{referral['sharing_price']}",
         })
     else:
         return jsonify({"valid": False, "message": "Invalid referral code."}), 400
