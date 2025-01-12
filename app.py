@@ -201,6 +201,8 @@ def add_to_cart():
 
 @app.route("/cart", methods=["GET"])
 def view_cart():
+    global g_referral_code, g_sharing_price
+    g_referral_code = None
     if "user_id" not in session:
         flash("Please log in to view your cart.", "warning")
         return redirect(url_for("login_form", next = request.url))
