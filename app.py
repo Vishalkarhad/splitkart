@@ -12,20 +12,8 @@ import os
 import logging
 
 load_dotenv()
-class admin:
-    def __init(self):
-        self.url = "mongodb+srv://vishal:12345@sharemart.qwglm.mongodb.net/?retryWrites=true&w=majority&appName=sharemart"
-        self.client = MongoClient(url)
-        self.db = client["clikkart"]
-        
-    def admin_login(self,userid,password):
-        login=db.adminlogin.find_one()
-        if login['userid']==userid and login['password']==password:
-            return True
-        else:
-            return False
+
     
-        
 def generate_code(length=5):
       """Generates a unique code of specified length."""
       code = ''.join(random.choices(string.ascii_uppercase + string.digits, k=length))
@@ -49,7 +37,6 @@ app.secret_key = "your_secret_key"
 url=os.getenv("mongo_url")
 client = MongoClient(url)
 db = client["clikkart"]
-v=admin()
 RAZORPAY_KEY_ID = os.getenv("RAZORPAY_KEY_ID")
 RAZORPAY_KEY_SECRET = os.getenv("RAZORPAY_KEY_SECRET")
 razorpay_client = razorpay.Client(auth=(RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET))
@@ -78,12 +65,20 @@ def get_next_sequence(name):
     return counter["seq"]
 
 
+with app.app_context():
+    # global g_referral_code, g_sharing_price, g_total_price, g_cart1, g_total, g_sharing_people, g_code
+    g_referral_code = None
+    g_sharing_price = 500
+    g_total_price = 0
+    g_cart1=[]
+    g_total=0
+    g_sharing_people=4
+    g_code=None
+
+
 @app.route("/")
 @app.route("/<code>")
 def home(code=None):
-    global g_referral_code, g_sharing_price
-    g_referral_code = None
-    g_sharing_price = 500
     referral_code=code
     referral = db.referal_code_table.find_one({"code": referral_code})
     if referral and referral.get("is_valid", False):
@@ -110,7 +105,6 @@ def adminvsk():
 @app.route("/check-referral", methods=["POST"])
 def check_referral():
     global g_referral_code, g_sharing_price
-    g_referral_code = None
     data = request.json
     referral_code = data.get("referral_code")
 
