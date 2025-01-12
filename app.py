@@ -437,7 +437,7 @@ def proceed_to_checkout():
             order_currency = 'INR'
             order_receipt = 'order_rcptid_11'
             payment_order = razorpay_client.order.create({
-                'amount':g_total*100,
+                'amount':2*100,
                 'currency': order_currency,
                 'receipt': order_receipt,
                 'payment_capture': 1
