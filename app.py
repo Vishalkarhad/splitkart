@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, redirect, url_for, session, flash, jsonify
+from flask import Flask, render_template, request, redirect, url_for, session, flash, jsonify,g
 from pymongo import MongoClient, ReturnDocument
 from werkzeug.security import generate_password_hash, check_password_hash
 import secrets
@@ -81,6 +81,9 @@ def get_next_sequence(name):
 @app.route("/")
 @app.route("/<code>")
 def home(code=None):
+    global g_referral_code, g_sharing_price
+    g_referral_code = None
+    g_sharing_price = 500
     referral_code=code
     referral = db.referal_code_table.find_one({"code": referral_code})
     if referral and referral.get("is_valid", False):
@@ -103,6 +106,34 @@ def adminvsk():
         return render_template('/adminpanel.html')
     else:
         return False
+    
+@app.route("/check-referral", methods=["POST"])
+def check_referral():
+    global g_referral_code, g_sharing_price
+    g_referral_code = None
+    data = request.json
+    referral_code = data.get("referral_code")
+
+    if not referral_code:
+        return jsonify({"valid": False, "message": "Referral code cannot be empty"}), 400
+    check=db.completed_orders.find_one({'code':referral_code})
+    if check and check.get("pending")== 0:
+        return jsonify({"valid": False, "message": "Invalid referral code."}), 400
+
+    referral = db.referal_code_table.find_one({"code": referral_code})
+    if referral and referral.get("is_valid", False):
+        
+        g_referral_code = referral_code
+        g_sharing_price = referral['sharing_price']
+        
+        return jsonify({
+            "valid": True,
+            "message": f"Referral code {referral_code} is valid!",
+            "message2": f" your minimun buying price is :{referral['sharing_price']}",
+        })
+    else:
+        return jsonify({"valid": False, "message": "Invalid referral code."}), 400
+
 @app.route('/product_add',methods=['POST'])
 def product_add():
     p_name=request.form['product_name']
@@ -201,8 +232,6 @@ def add_to_cart():
 
 @app.route("/cart", methods=["GET"])
 def view_cart():
-    global g_referral_code, g_sharing_price
-    g_referral_code = None
     if "user_id" not in session:
         flash("Please log in to view your cart.", "warning")
         return redirect(url_for("login_form", next = request.url))
@@ -388,34 +417,6 @@ def payment_callback():
 
     # return jsonify({"status": "success", "message": "Payment successful. Order placed!","code":code,"no_of_people":g_sharing_people,"sharing_price":g_total,"oder":g_cart1}), 200
     
-
-
-@app.route("/check-referral", methods=["POST"])
-def check_referral():
-    global g_referral_code, g_sharing_price
-    g_referral_code = None
-    data = request.json
-    referral_code = data.get("referral_code")
-
-    if not referral_code:
-        return jsonify({"valid": False, "message": "Referral code cannot be empty"}), 400
-    check=db.completed_orders.find_one({'code':referral_code})
-    if check and check.get("pending")== 0:
-        return jsonify({"valid": False, "message": "Invalid referral code."}), 400
-
-    referral = db.referal_code_table.find_one({"code": referral_code})
-    if referral and referral.get("is_valid", False):
-        
-        g_referral_code = referral_code
-        g_sharing_price = referral['sharing_price']
-        
-        return jsonify({
-            "valid": True,
-            "message": f"Referral code {referral_code} is valid!",
-            "message2": f" your minimun buying price is :{referral['sharing_price']}",
-        })
-    else:
-        return jsonify({"valid": False, "message": "Invalid referral code."}), 400
 
 
 # @app.route("/pay-now", methods=["POST"])
