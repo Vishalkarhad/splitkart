@@ -80,7 +80,7 @@ db = client["clikkart"]
 RAZORPAY_KEY_ID = os.getenv("RAZORPAY_KEY_ID")
 RAZORPAY_KEY_SECRET = os.getenv("RAZORPAY_KEY_SECRET")
 razorpay_client = razorpay.Client(auth=(RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET))
-v=App()
+
 
 
 # Counters collection for user IDs
@@ -102,6 +102,7 @@ def get_next_sequence(name):
 @app.route("/")
 @app.route("/<code>")
 def home(code=None):
+    v=App()
     referral_code=code
     referral = db.referal_code_table.find_one({"code": referral_code})
     if referral and referral.get("is_valid", False):
