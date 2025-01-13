@@ -69,12 +69,12 @@ def home(code=None):
     session['g_sharing_people']=4
     session['g_code']=None
 
-
-    referral_code=code
-    referral = db.referal_code_table.find_one({"code": referral_code})
+    
+    link_referral_code=code
+    referral = db.referal_code_table.find_one({"code": link_referral_code})
     if referral and referral.get("is_valid", False):
     
-        session['g_referral_code'] = referral_code
+        session['g_referral_code'] = link_referral_code
         session['g_sharing_price'] = referral['sharing_price']
     total_docs = db.product_list.count_documents({})
     products=db.product_list.aggregate([{"$sample": {"size": total_docs}}])
@@ -94,7 +94,8 @@ def check_referral():
 
     referral = db.referal_code_table.find_one({"code": referral_code})
     if referral and referral.get("is_valid", False):
-        
+       
+            
         session['g_referral_code'] = referral_code
         session['g_sharing_price'] = referral['sharing_price']
         
