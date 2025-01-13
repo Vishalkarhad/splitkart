@@ -476,5 +476,20 @@ def order_details(code):
 def tc():
     return render_template("tc.html")
 
+@app.route("/reset")
+def reset_password():
+    return render_template("reset.html")
+
+@app.route('/reset_password',methods=['POST'])
+def reset_password1():
+    mobile_no = request.form['mobile_no']
+    password = request.form['password']
+    user = db.users.find_one({"mobile_no": mobile_no})
+    if user:
+        db.users.update_one({"mobile_no": mobile_no}, {"$set": {"password": password}})
+        return render_template("login.html")
+    else:
+        return render_template("reset.html", message="Mobile number not found. please signup")
+
 if __name__ == "__main__":
     app.run(debug=True)

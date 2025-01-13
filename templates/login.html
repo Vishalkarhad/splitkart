@@ -122,12 +122,15 @@
             </form>
             <div class="signup-link">
                 <p>Don't have an account? <a href="/signup">Sign up here</a>.</p>
+                
                 <div class="flash-messages">
                     {% with messages = get_flashed_messages() %}
                         {% if messages %}
                             <ul>
                                 {% for message in messages %}
                                     <li>{{ message }}</li>
+
+                                    <p>Reset your password <a href="/reset">click here</a>.</p>
                                 {% endfor %}
                             </ul>
                         {% endif %}
