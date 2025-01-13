@@ -204,6 +204,13 @@
                                 <option value=8>8</option>
                                 <option value=9>9</option>
                                 <option value=10>10</option>
+                                <option value=11>11</option>
+                                <option value=12>12</option>
+                                <option value=13>13</option>
+                                <option value=14>14</option>
+                                <option value=15>15</option>
+                                <option value=16>16</option>
+                                <option value=17>17</option>
                             </select>
                             <div class="input-group-append">
                                 <button class="btn btn-primary">Share with people </button>
@@ -237,6 +244,7 @@
                             </div>
                             <p style="color: #df0e2a; font-size: 10px;" >Warning:: Your total amount is Minimum Buying price of another</p>
                             <form action="/proceed_to_checkout">
+                                <input type="checkbox" name="" id="" checked required><a href="/tc" style="color: rgb(70, 70, 200); font-size: 14px;"> I agree to the Terms and Conditions</a>
                             <button class="btn btn-block btn-primary font-weight-bold my-3 py-3">Proceed To Checkout</button>
                             {% with messages = get_flashed_messages() %}
                                 {% if messages %}

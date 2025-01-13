@@ -470,8 +470,11 @@ def order():
 @app.route("/order_details/<code>")
 def order_details(code):
     order1=db.completed_orders.find_one({"code": code,"user_id": session["user_id"]})
-    return render_template("order_details.html",order1=order1)
-
+    payment_id=db.address.find_one({"code": code,"user_id": session["user_id"]})
+    return render_template("order_details.html",order1=order1,payment_id=payment_id)
+@app.route("/tc")
+def tc():
+    return render_template("tc.html")
 
 if __name__ == "__main__":
     app.run(debug=True)
