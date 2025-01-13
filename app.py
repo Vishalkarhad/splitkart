@@ -12,46 +12,6 @@ import os
 import logging
 
 load_dotenv()
-class App:
-    def __init__(self):
-        self.g_total_price = 0
-        self.g_cart1 = []
-        self.g_total = 0
-        self.g_sharing_people = 4
-        self.g_code = None
-        self.g_referral_code = None
-        self.g_sharing_price = 500
-
-    def get_g_total_price(self):
-        return self.g_total_price
-    def get_g_cart1(self):
-        return self.g_cart1
-    def get_g_total(self):
-        return self.g_total
-    def get_g_sharing_people(self):
-        return self.g_sharing_people
-    def get_g_code(self):
-        return self.g_code
-    def get_g_referral_code(self):
-        return self.g_referral_code
-    def get_g_sharing_price(self):
-        return self.g_sharing_price
-    
-
-    def set_g_total_price(self, total_price):
-        self.g_total_price = total_price
-    def set_g_cart1(self, cart1):
-        self.g_cart1 = cart1
-    def set_g_total(self, total):
-        self.g_total = total
-    def set_g_sharing_people(self, sharing_people):
-        self.g_sharing_people = sharing_people
-    def set_g_code(self, code):
-        self.g_code = code
-    def set_g_referral_code(self, referral_code):
-        self.g_referral_code = referral_code
-    def set_g_sharing_price(self,sharing_price):
-        self.g_sharing_price=sharing_price
 
     
 def generate_code(length=5):
@@ -82,7 +42,6 @@ RAZORPAY_KEY_SECRET = os.getenv("RAZORPAY_KEY_SECRET")
 razorpay_client = razorpay.Client(auth=(RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET))
 
 
-
 # Counters collection for user IDs
 if not db.counters.find_one({"_id": "user_id"}):
     db.counters.insert_one({"_id": "user_id", "seq": 0})
@@ -102,12 +61,21 @@ def get_next_sequence(name):
 @app.route("/")
 @app.route("/<code>")
 def home(code=None):
-    v=App()
+    session['g_referral_code'] = None
+    session['g_sharing_price'] = 500
+    session['g_cart1']=[]
+    session['g_total_price']=0
+    session['g_total']=0
+    session['g_sharing_people']=4
+    session['g_code']=None
+
+
     referral_code=code
     referral = db.referal_code_table.find_one({"code": referral_code})
     if referral and referral.get("is_valid", False):
-        v.set_g_referral_code(referral_code)
-        v.set_g_sharing_price(referral['sharing_price']) 
+    
+        session['g_referral_code'] = referral_code
+        session['g_sharing_price'] = referral['sharing_price']
     total_docs = db.product_list.count_documents({})
     products=db.product_list.aggregate([{"$sample": {"size": total_docs}}])
     return render_template("index.html",products=products)
@@ -127,8 +95,8 @@ def check_referral():
     referral = db.referal_code_table.find_one({"code": referral_code})
     if referral and referral.get("is_valid", False):
         
-        v.set_g_referral_code(referral_code)
-        v.set_g_sharing_price(referral['sharing_price'])
+        session['g_referral_code'] = referral_code
+        session['g_sharing_price'] = referral['sharing_price']
         
         return jsonify({
             "valid": True,
@@ -226,28 +194,26 @@ def view_cart():
         return redirect(url_for("login_form", next = request.url))
 
     cart_list = db.cart.find({"user_id": session["user_id"]})
-    
+    # global g_cart1
     g_cart1=[]
     total_price=0
     for i in cart_list:
         for n in range(0,len(i['items'])):
             g_cart1.append([i['items'][n]['producturl'],i['items'][n]['product_name'],i['items'][n]['price']])
             total_price +=i['items'][n]['price']
-    v.set_g_cart1(g_cart1)
-    # global g_total_price,g_sharing_people,g_total
-    g_total_price = total_price
-    v.set_g_total_price(g_total_price)
-    v.set_g_total(g_total_price//(v.get_g_sharing_people()-1))
-    return render_template("cart1.html", cart=v.get_g_cart1() ,total_price1=v.get_g_total_price()//3,total_price=v.get_g_total_price() ,share_with_people=4,referral_code=v.get_g_referral_code(),s_price=v.get_g_sharing_price())
+    session['g_cart1']=g_cart1
+    session['g_total_price'] = total_price
+    session['g_total']=session['g_total_price']//(session['g_sharing_people']-1)
+    return render_template("cart1.html", cart=g_cart1 ,total_price1=session['g_total_price']//3,total_price=session['g_total_price'] ,share_with_people=4,referral_code=session['g_referral_code'],s_price=session['g_sharing_price'])
 
 @app.route("/cart_summary", methods=["GET", "POST"])
 def cart_summary():
     if request.method == "POST":
-        # global g_sharing_people
-        v.set_g_sharing_people(int(request.form['category']))
-        # global g_total_price, g_total, g_cart1
-        v.set_g_total(v.get_g_total_price() // (v.get_g_sharing_people() - 1))
-        return render_template("cart1.html", cart=v.get_g_cart1(), total_price1=v.get_g_total(), total_price=v.get_g_total_price(), share_with_people=v.get_g_sharing_people(), referral_code=v.get_g_referral_code(), s_price=v.get_g_sharing_price())
+        
+        session['g_sharing_people'] = int(request.form['category'])
+        
+        session['g_total'] = session['g_total_price'] // (session['g_sharing_people'] - 1)
+        return render_template("cart1.html", cart=session['g_cart1'], total_price1=session['g_total'], total_price=session['g_total_price'], share_with_people=session['g_sharing_people'], referral_code=session['g_referral_code'], s_price=session['g_sharing_price'])
     else:
         # Handle GET request if needed
         return redirect(url_for('view_cart2'))
@@ -259,17 +225,18 @@ def view_cart2():
         return redirect(url_for("login_form",next=request.url))
 
     cart_list = db.cart.find({"user_id": session["user_id"]})
-    # global g_cart1
+    
     g_cart1 = []
     total_price = 0
     for i in cart_list:
         for n in range(len(i['items'])):
             g_cart1.append([i['items'][n]['producturl'], i['items'][n]['product_name'], i['items'][n]['price']])
             total_price += i['items'][n]['price']
-    # global g_total_price, g_sharing_people, g_total
-    v.set_g_total_price(total_price)
-    v.set_g_total(v.get_g_total_price() // (v.get_g_sharing_people() - 1)) 
-    return render_template("cart1.html", cart=g_cart1, total_price1=v.get_g_total_price() // 3, total_price=v.get_g_total_price(), share_with_people=4, referral_code=v.get_g_referral_code(), s_price=v.get_g_sharing_price())
+    session['g_cart1']=g_cart1
+    
+    session['g_total_price'] = total_price
+    session['g_total'] = session['g_total_price'] // (session['g_sharing_people'] - 1)
+    return render_template("cart1.html", cart=session['g_cart1'], total_price1=session['g_total_price'] // 3, total_price=session['g_total_price'], share_with_people=4, referral_code=session['g_referral_code'], s_price=session['g_sharing_price'])
 
 
 
@@ -295,15 +262,15 @@ def remove_item():
 def checkout():
     completed_order = {
             "user_id": session["user_id"],
-            "items": v.get_g_cart1(),
-            "total_price": v.get_g_total_price(),
-            'code':v.get_g_code(),
-            'sharing_price':v.get_g_total(),
-            'sharing_people':v.get_g_sharing_people(),
-            "use_code":v.get_g_referral_code(),
-            "minumum_buying_price":v.get_g_sharing_price(),
+            "items": session['g_cart1'],
+            "total_price": session['g_total_price'],
+            'code':session['g_code'],
+            'sharing_price':session['g_total'],
+            'sharing_people':session['g_sharing_people'],
+            "use_code":session['g_referral_code'],
+            "minumum_buying_price":session['g_sharing_price'],
             "payment_status": "success",
-            "pending":v.get_g_sharing_people(),
+            "pending":session['g_sharing_people'],
               # Store additional payment details if available
             "order_date": datetime.utcnow()
         }
@@ -312,7 +279,7 @@ def checkout():
     
     
     db.completed_orders.insert_one(completed_order)
-    filter = {"code":v.get_g_referral_code()}
+    filter = {"code":session['g_referral_code']}
     document = db.completed_orders.find_one(filter)
     if document:
         # Get the current value of sharing_people
@@ -325,7 +292,7 @@ def checkout():
     
     db.cart.update_one({"user_id":session["user_id"]}, {"$set": {"items": []}})
     
-    return render_template("orderplace.html" ,code=v.get_g_code(),no_of_people=v.get_g_sharing_people(),sharing_price=v.get_g_total(),cart=v.get_g_cart1())
+    return render_template("orderplace.html" ,code=session['g_code'],no_of_people=session['g_sharing_people'],sharing_price=session['g_total'],cart=session['g_cart1'])
    
     
 @app.route('/payment/callback', methods=['POST'])   
@@ -359,9 +326,9 @@ def payment_callback():
         
         payment_data = {
             "user_id": session["user_id"],
-            "code":g_code,
+            "code":session['g_code'],
             
-            "cart": v.get_g_cart1(),
+            "cart": session['g_cart1'],
             "payment_id": payment_id,
             "order_id": order_id,
             "first_name": fname,
@@ -378,12 +345,12 @@ def payment_callback():
         db.address.insert_one(payment_data)
         db.referal_code_table.insert_one({
              "profile_id": session["user_id"],
-             "product_id": v.get_g_cart1(),
-             "code": v.get_g_code(),
-             "sharing_price": v.get_g_total(),
-             "no_of_people": v.get_g_sharing_people(),
-             "original_price": v.get_g_total_price(),
-             "use_code":v.get_g_referral_code(),
+             "product_id": session['g_cart1'],
+             "code": session['g_code'],
+             "sharing_price": session['g_total'],
+             "no_of_people": session['g_sharing_people'],
+             "original_price": session['g_total_price'],
+             "use_code":session['g_referral_code'],
              "is_valid": True})  # Store the referral code in the database
 
         # Verification successful
@@ -423,12 +390,10 @@ def payment_callback():
 
 @app.route("/proceed_to_checkout")
 def proceed_to_checkout():
-    # global g_cart1,g_sharing_people,g_total_price,g_total
-    if v.get_g_total()>=v.get_g_sharing_price() and v.get_g_total()>=500:
+    if session['g_total']>=session['g_sharing_price'] and session['g_total']>=500:
         try:
-            global g_code
             g_code=generate_code()
-            v.set_g_code(g_code)
+            session['g_code']=g_code
             # Create Razorpay order
             # Amount in paise (100 paise = 1 INR)
             order_currency = 'INR'
@@ -439,13 +404,13 @@ def proceed_to_checkout():
                 'receipt': order_receipt,
                 'payment_capture': 1
             })
-            return render_template("checkout.html", cart=v.get_g_cart1(), total=v.get_g_total(), sharing_people=v.get_g_sharing_people(),total_price=v.get_g_total_price(),key_id=RAZORPAY_KEY_ID,order_id=payment_order['id'])
+            return render_template("checkout.html", cart=session['g_cart1'], total=session['g_total'], sharing_people=session['g_sharing_people'],total_price=session['g_total_price'],key_id=RAZORPAY_KEY_ID,order_id=payment_order['id'])
         except Exception as e:
             logging.error(f"Error in checkout: {e}")
             return "Error in creating order", 500
-    elif v.get_g_total() < v.get_g_sharing_price():
+    elif session['g_total']<session['g_sharing_price']:
         flash(f"your total is less than {session['g_sharing_price']}")
-        return render_template("cart1.html",  cart=v.get_g_cart1() ,total_price1=v.get_g_total(),total_price=v.get_g_total_price() ,share_with_people=v.get_g_sharing_people()-1,referral_code=v.get_g_referral_code(),s_price=v.get_g_sharing_price())
+        return render_template("cart1.html",  cart=session['g_cart1'] ,total_price1=session['g_total'],total_price=session['g_total_price'] ,share_with_people=session['g_sharing_people']-1,referral_code=session['g_referral_code'],s_price=session['g_sharing_price'])
 
 
 # @app.route("/success", methods=["POST"])
