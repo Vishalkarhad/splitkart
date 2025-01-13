@@ -41,8 +41,7 @@ RAZORPAY_KEY_ID = os.getenv("RAZORPAY_KEY_ID")
 RAZORPAY_KEY_SECRET = os.getenv("RAZORPAY_KEY_SECRET")
 razorpay_client = razorpay.Client(auth=(RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET))
 
-session['g_referral_code'] = None
-session['g_sharing_price'] = 500
+
 g_total_price = 0
 g_cart1=[]
 g_total=0
@@ -63,6 +62,11 @@ def get_next_sequence(name):
         return_document=ReturnDocument.AFTER
     )
     return counter["seq"]
+
+@app.before_request
+def initialize_session():
+    session['g_referral_code'] = None
+    session['g_sharing_price'] = 500
 
 
 @app.route("/")
