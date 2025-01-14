@@ -155,6 +155,10 @@
                                 <h6 class="font-weight-medium">share_with_people</h6>
                                 <h6 class="font-weight-medium">{{sharing_people}}</h6>
                             </div>
+                            <div class="d-flex justify-content-between">
+                                <h6 class="font-weight-medium">Referral code :</h6>
+                                <h6 class="font-weight-medium">{{ref_code}}</h6>
+                            </div>
                         </div>
                         <div class="pt-2">
                             <div class="d-flex justify-content-between mt-2">
@@ -236,7 +240,7 @@
             // Proceed with Razorpay payment
             var options = {
                 "key": "{{ key_id }}", // Razorpay API Key ID
-                "amount": "{{ 2 * 100 }}", // Amount in paise
+                "amount": "{{ total * 100 }}", // Amount in paise
                 "currency": "INR",
                 "name": "Splitkart Shop",
                 "description": "Test Transaction",

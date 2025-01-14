@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, redirect, url_for, session, flash, jsonify
+from flask import Flask, render_template, request, redirect, url_for, session, flash, jsonify, send_from_directory
 from pymongo import MongoClient, ReturnDocument
 from werkzeug.security import generate_password_hash, check_password_hash
 import secrets
@@ -57,24 +57,32 @@ def get_next_sequence(name):
     )
     return counter["seq"]
 
+@app.route('/favicon.ico')
+def favicon():
+    return send_from_directory('static', 'favicon.ico', mimetype='image/vnd.microsoft.icon')
 
+    
 @app.route("/")
 @app.route("/<code>")
 def home(code=None):
-    session['g_referral_code'] = None
-    session['g_sharing_price'] = 500
-    session['g_cart1']=[]
-    session['g_total_price']=0
-    session['g_total']=0
-    session['g_sharing_people']=4
-    session['g_code']=None
+    if code == "favicon.ico":
+        return "", 204  # Respond with no content
+    
+    r_code=code
+    session["g_referral_code"] = None
+    session["g_sharing_price"] = 500
+    session["g_cart1"] = []
+    session["g_total_price"] = 0
+    session["g_total"] = 0
+    session["g_sharing_people"] = 4
+    session["g_code"] = None
+    
 
     
-    link_referral_code=code
-    referral = db.referal_code_table.find_one({"code": link_referral_code})
+   
+    referral = db.referal_code_table.find_one({"code":r_code})
     if referral and referral.get("is_valid", False):
-    
-        session['g_referral_code'] = link_referral_code
+        session['g_referral_code'] = r_code
         session['g_sharing_price'] = referral['sharing_price']
     total_docs = db.product_list.count_documents({})
     products=db.product_list.aggregate([{"$sample": {"size": total_docs}}])
@@ -137,7 +145,7 @@ def signup():
 
 @app.route("/login", methods=["GET"])
 def login_form():
-    next_url = request.args.get("next")  # Get the 'next' parameter if present
+    next_url = request.args.get("next", "")  # Get the 'next' parameter if present
     return render_template("login.html", next=next_url)
 
 
@@ -146,12 +154,13 @@ def login_form():
 def login():
     mobile = request.form.get("mobile")
     password = request.form.get("password")
+    next_url = request.form.get("next")
 
     user = db.users.find_one({"mobile_no": mobile})
     if user and user["password"]== password:
         session["user_id"] = user["user_id"]
         flash("Login successful!", "success")
-        return redirect(url_for("home"))
+        return redirect(next_url or url_for("home"))
     else:
         flash("Invalid mobile number or password.", "danger")
         return redirect(url_for("login_form"))
@@ -160,6 +169,13 @@ def login():
 @app.route("/logout")
 def logout():
     session.pop("user_id", None)
+    session.pop("g_referral_code", None)
+    session.pop("g_sharing_price", None)
+    session.pop("g_cart1", None)
+    session.pop("g_total_price", None)
+    session.pop("g_total", None)
+    session.pop("g_sharing_people", None)
+    session.pop("g_code", None)
     flash("Logged out successfully.", "success")
     return redirect(url_for("home"))
 
@@ -192,7 +208,7 @@ def add_to_cart():
 def view_cart():
     if "user_id" not in session:
         flash("Please log in to view your cart.", "warning")
-        return redirect(url_for("login_form", next = request.url))
+        return redirect(url_for("login_form", next=request.url))
 
     cart_list = db.cart.find({"user_id": session["user_id"]})
     # global g_cart1
@@ -364,31 +380,6 @@ def payment_callback():
         return jsonify({"status": "failure", "error": str(e)})
     
 
-    
-    
-    
-
-
-     
-
-        # Empty the user's cart
-    
-
-    # return jsonify({"status": "success", "message": "Payment successful. Order placed!","code":code,"no_of_people":g_sharing_people,"sharing_price":g_total,"oder":g_cart1}), 200
-    
-
-
-# @app.route("/pay-now", methods=["POST"])
-# def pay_now():
-#     if "user_id" not in session:
-#         flash("Please log in to proceed with payment.", "warning")
-#         return redirect(url_for("login_form"))
-
-#     # Clear the cart after payment
-#     db.cart.delete_many({"user_id": session["user_id"]})
-#     flash("Payment successful! Your cart has been cleared.", "success")
-#     return redirect(url_for("home"))
-
 @app.route("/proceed_to_checkout")
 def proceed_to_checkout():
     if session['g_total']>=session['g_sharing_price'] and session['g_total']>=500:
@@ -400,12 +391,15 @@ def proceed_to_checkout():
             order_currency = 'INR'
             order_receipt = 'order_rcptid_11'
             payment_order = razorpay_client.order.create({
-                'amount':2*100,
+                'amount':session['g_total']*100,
                 'currency': order_currency,
                 'receipt': order_receipt,
                 'payment_capture': 1
             })
-            return render_template("checkout.html", cart=session['g_cart1'], total=session['g_total'], sharing_people=session['g_sharing_people'],total_price=session['g_total_price'],key_id=RAZORPAY_KEY_ID,order_id=payment_order['id'])
+            
+
+
+            return render_template("checkout.html", cart=session['g_cart1'], total=session['g_total'], sharing_people=session['g_sharing_people'],total_price=session['g_total_price'],key_id=RAZORPAY_KEY_ID,order_id=payment_order['id'],ref_code=session['g_referral_code'])
         except Exception as e:
             logging.error(f"Error in checkout: {e}")
             return "Error in creating order", 500
@@ -459,11 +453,11 @@ def proceed_to_checkout():
 #         return render_template("success.html", payment_id=payment_id,code=code)
 #     except razorpay.errors.SignatureVerificationError:
 #         return "Payment verification failed!", 400
-@app.route("/order")
+@app.route("/order", methods=["GET"])
 def order():
     if "user_id" not in session:
         flash("Please log in to view your orders.", "warning")
-        return redirect(url_for("login_form"))
+        return redirect(url_for("login_form", next=request.url))
     order1=db.completed_orders.find({"user_id": session["user_id"]})
     profile=db.users.find_one({"user_id": session["user_id"]})
     return render_template("order.html",order1=order1,profile=profile)

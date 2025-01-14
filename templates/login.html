@@ -99,10 +99,10 @@
             <div class="logo">SPLITKART STORE <img src="https://cdn-icons-png.flaticon.com/128/7734/7734681.png" alt="" width="40px" height="40px"></div>
             <ul class="menu">
                 <li><a href="/">Home</a></li>
-                <li><a href="#">Shop</a></li>
+                <li><a href="/order">order</a></li>
                 <li><a href="/cart">Cart</a></li>
-                <li><a href="/login">Login</a></li>
-                <li><a href="/signup">Signup</a></li>
+                <li><a href="/signup">signup</a></li>
+                <li><a href="/logout">Logout</a></li>
             </ul>
         </nav>
     </header>
@@ -111,7 +111,8 @@
     <main>
         <div class="login-form-container">
             <h2>Login</h2>
-            <form action="/login1" method="POST">
+            <form action="{{ url_for('login') }}", method="POST">
+                <input type="hidden" name="next" value="{{ next }}">
                 <label for="mobile">Mobile Number:</label>
                 <input type="text" id="mobile" name="mobile" placeholder="Enter your mobile number" required>
 
@@ -122,6 +123,7 @@
             </form>
             <div class="signup-link">
                 <p>Don't have an account? <a href="/signup">Sign up here</a>.</p>
+                <p>Reset your password <a href="/reset">click here</a></p>
                 
                 <div class="flash-messages">
                     {% with messages = get_flashed_messages() %}
@@ -130,7 +132,7 @@
                                 {% for message in messages %}
                                     <li>{{ message }}</li>
 
-                                    <p>Reset your password <a href="/reset">click here</a>.</p>
+                                    
                                 {% endfor %}
                             </ul>
                         {% endif %}
